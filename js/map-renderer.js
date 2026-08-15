@@ -1,6 +1,13 @@
 /**
- * EcoSense Interactive Map Renderer (Leaflet.js)
- * Manages Bangalore ward geospatial layers, custom zone pins, and popup triage
+ * EcoSense Live Google Maps Interactive Renderer
+ * 
+ * Features:
+ * 1. Live Google Maps JavaScript API integration (Satellite & Hybrid views, Road Map, Terrain)
+ * 2. Full zooming, panning, and modern sleek custom-styled controls
+ * 3. Browser Geolocation auto-detection with custom Eco-Pulse marker
+ * 4. Map click-to-coordinate picker that updates the EcoSense GPS reporting interface
+ * 5. Incident triage pins with SLA color codes & rich InfoWindows
+ * 6. Responsive, mobile & desktop optimized
  */
 
 export class MapRenderer {
@@ -8,63 +15,288 @@ export class MapRenderer {
     this.containerId = mapContainerId;
     this.onIncidentSelect = onIncidentSelect;
     this.map = null;
-    this.markersLayer = null;
-    this.wardPolygonsLayer = null;
+    this.markers = [];
+    this.userLocationMarker = null;
+    this.clickPinMarker = null;
+    this.infoWindow = null;
     this.currentFilter = "all";
     this.incidents = [];
+    this.bangaloreCenter = { lat: 12.9716, lng: 77.5946 };
   }
 
   initMap() {
-    if (typeof L === "undefined") {
-      console.warn("Leaflet library not loaded yet.");
-      return;
-    }
-
     const container = document.getElementById(this.containerId);
     if (!container) return;
 
-    // Centered on Bangalore City
-    this.map = L.map(this.containerId, {
-      center: [12.9650, 77.6200],
-      zoom: 12,
-      zoomControl: true
-    });
+    if (typeof google === "undefined" || !google.maps) {
+      // If Google Maps SDK is loading asynchronously, wait for it or load via EcoSenseMapsConfig
+      if (window.EcoSenseMapsConfig && window.EcoSenseMapsConfig.loadGoogleMapsSDK) {
+        window.EcoSenseMapsConfig.loadGoogleMapsSDK(() => this._createGoogleMap(container));
+      } else {
+        window.addEventListener("ecosense_maps_ready", () => this._createGoogleMap(container));
+      }
+      return;
+    }
 
-    // Dark-themed sleek basemap (CartoDB Dark Matter / OSM)
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
-      attribution: '&copy; <a href="https://carto.com/">CARTO</a> | EcoSense BBMP GIS',
-      maxZoom: 19
-    }).addTo(this.map);
-
-    this.markersLayer = L.layerGroup().addTo(this.map);
-    this.wardPolygonsLayer = L.layerGroup().addTo(this.map);
-
-    this._drawBangaloreWards();
+    this._createGoogleMap(container);
   }
 
-  _drawBangaloreWards() {
-    // Simulated BBMP Ward boundary polygons with subtle thematic tint
-    const wardZones = [
-      { name: "Indiranagar (Ward 112)", coords: [[12.980, 77.630], [12.985, 77.655], [12.965, 77.658], [12.960, 77.632]], color: "#ef4444" },
-      { name: "Koramangala (Ward 151)", coords: [[12.945, 77.615], [12.948, 77.640], [12.925, 77.638], [12.922, 77.612]], color: "#f97316" },
-      { name: "HSR Layout (Ward 174)", coords: [[12.920, 77.635], [12.922, 77.660], [12.900, 77.655], [12.902, 77.630]], color: "#eab308" },
-      { name: "Malleshwaram (Ward 45)", coords: [[13.010, 77.560], [13.012, 77.585], [12.988, 77.580], [12.985, 77.558]], color: "#10b981" },
-      { name: "Whitefield (Ward 84)", coords: [[12.995, 77.735], [12.998, 77.765], [12.970, 77.760], [12.972, 77.730]], color: "#ef4444" }
+  _createGoogleMap(container) {
+    if (this.map) return; // Already initialized
+
+    // Dark lush eco styled theme for Google Maps
+    const ecoDarkStyle = [
+      { elementType: "geometry", stylers: [{ color: "#0f2e22" }] },
+      { elementType: "labels.text.stroke", stylers: [{ color: "#041812" }] },
+      { elementType: "labels.text.fill", stylers: [{ color: "#6ee7b7" }] },
+      {
+        featureType: "administrative.locality",
+        elementType: "labels.text.fill",
+        stylers: [{ color: "#a7f3d0" }]
+      },
+      {
+        featureType: "poi",
+        elementType: "labels.text.fill",
+        stylers: [{ color: "#34d399" }]
+      },
+      {
+        featureType: "poi.park",
+        elementType: "geometry",
+        stylers: [{ color: "#093829" }]
+      },
+      {
+        featureType: "poi.park",
+        elementType: "labels.text.fill",
+        stylers: [{ color: "#4ade80" }]
+      },
+      {
+        featureType: "road",
+        elementType: "geometry",
+        stylers: [{ color: "#164e3b" }]
+      },
+      {
+        featureType: "road",
+        elementType: "geometry.stroke",
+        stylers: [{ color: "#064e3b" }]
+      },
+      {
+        featureType: "road",
+        elementType: "labels.text.fill",
+        stylers: [{ color: "#a7f3d0" }]
+      },
+      {
+        featureType: "road.highway",
+        elementType: "geometry",
+        stylers: [{ color: "#047857" }]
+      },
+      {
+        featureType: "road.highway",
+        elementType: "geometry.stroke",
+        stylers: [{ color: "#065f46" }]
+      },
+      {
+        featureType: "transit",
+        elementType: "geometry",
+        stylers: [{ color: "#0d3b2e" }]
+      },
+      {
+        featureType: "water",
+        elementType: "geometry",
+        stylers: [{ color: "#042018" }]
+      },
+      {
+        featureType: "water",
+        elementType: "labels.text.fill",
+        stylers: [{ color: "#38bdf8" }]
+      }
     ];
 
-    wardZones.forEach(w => {
-      L.polygon(w.coords, {
-        color: w.color,
-        weight: 1.5,
-        fillColor: w.color,
+    this.map = new google.maps.Map(container, {
+      center: this.bangaloreCenter,
+      zoom: 12,
+      mapTypeId: google.maps.MapTypeId.ROADMAP,
+      mapTypeControl: true,
+      mapTypeControlOptions: {
+        style: google.maps.MapTypeControlStyle.HORIZONTAL_BAR,
+        position: google.maps.ControlPosition.TOP_LEFT
+      },
+      zoomControl: true,
+      zoomControlOptions: {
+        position: google.maps.ControlPosition.RIGHT_BOTTOM
+      },
+      scaleControl: true,
+      streetViewControl: true,
+      streetViewControlOptions: {
+        position: google.maps.ControlPosition.RIGHT_BOTTOM
+      },
+      fullscreenControl: true,
+      styles: ecoDarkStyle
+    });
+
+    this.infoWindow = new google.maps.InfoWindow();
+
+    // 1. Detect User Geolocation automatically with permission
+    this._detectUserLocation();
+
+    // 2. Click anywhere on Google Map to retrieve and display coordinates
+    this._bindMapClickCoordinates();
+
+    // 3. Render incident markers and Bangalore zone bounds
+    this.renderMarkers();
+    this._drawBangaloreZones();
+  }
+
+  _detectUserLocation() {
+    if (!navigator.geolocation || !this.map) return;
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const userPos = {
+          lat: position.coords.latitude,
+          lng: position.coords.longitude
+        };
+
+        // Create Custom User Location Marker (Pulsing Eco-Blue Ring)
+        if (this.userLocationMarker) this.userLocationMarker.setMap(null);
+
+        this.userLocationMarker = new google.maps.Marker({
+          position: userPos,
+          map: this.map,
+          title: "Your Live Location (GPS Active)",
+          icon: {
+            path: google.maps.SymbolPath.CIRCLE,
+            scale: 9,
+            fillColor: "#38bdf8",
+            fillOpacity: 1,
+            strokeColor: "#ffffff",
+            strokeWeight: 2.5
+          },
+          zIndex: 999
+        });
+
+        // Update GPS label in Citizen reporting form if on citizen page
+        this._updateReportingGpsLabel(userPos.lat, userPos.lng, "📍 Live GPS Locked (User Location)");
+      },
+      (error) => {
+        console.log("ℹ️ Geolocation permission prompt result:", error.message);
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  }
+
+  _bindMapClickCoordinates() {
+    if (!this.map) return;
+
+    this.map.addListener("click", (e) => {
+      const clickedLat = +e.latLng.lat().toFixed(5);
+      const clickedLng = +e.latLng.lng().toFixed(5);
+
+      // Place / Move interactive click pin
+      if (!this.clickPinMarker) {
+        this.clickPinMarker = new google.maps.Marker({
+          position: { lat: clickedLat, lng: clickedLng },
+          map: this.map,
+          title: "Selected Incident Location",
+          animation: google.maps.Animation.DROP,
+          icon: {
+            path: "M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z",
+            fillColor: "#10b981",
+            fillOpacity: 1,
+            strokeColor: "#ffffff",
+            strokeWeight: 1.5,
+            scale: 1.5,
+            anchor: new google.maps.Point(12, 24)
+          }
+        });
+      } else {
+        this.clickPinMarker.setPosition({ lat: clickedLat, lng: clickedLng });
+      }
+
+      // Update EcoSense GPS label and location inputs
+      this._updateReportingGpsLabel(clickedLat, clickedLng, `📍 Map Picked: ${clickedLat}° N, ${clickedLng}° E`);
+    });
+  }
+
+  _updateReportingGpsLabel(lat, lng, labelText) {
+    const gpsBadge = document.getElementById("gps-coords-label");
+    if (gpsBadge) {
+      gpsBadge.setAttribute("data-lat", lat);
+      gpsBadge.setAttribute("data-lng", lng);
+      gpsBadge.textContent = labelText || `📍 Coordinates: ${lat}° N, ${lng}° E`;
+    }
+  }
+
+  _drawBangaloreZones() {
+    if (!this.map) return;
+
+    const zones = [
+      {
+        name: "East Zone (Indiranagar / CV Raman / Ulsoor)",
+        coords: [
+          { lat: 12.980, lng: 77.610 },
+          { lat: 12.995, lng: 77.665 },
+          { lat: 12.960, lng: 77.670 },
+          { lat: 12.955, lng: 77.615 }
+        ],
+        color: "#10b981"
+      },
+      {
+        name: "South Zone (Koramangala / Jayanagar / JP Nagar)",
+        coords: [
+          { lat: 12.945, lng: 77.560 },
+          { lat: 12.950, lng: 77.640 },
+          { lat: 12.905, lng: 77.635 },
+          { lat: 12.895, lng: 77.565 }
+        ],
+        color: "#f97316"
+      },
+      {
+        name: "Bommanahalli Zone (HSR / Begur / Electronic City)",
+        coords: [
+          { lat: 12.920, lng: 77.620 },
+          { lat: 12.922, lng: 77.670 },
+          { lat: 12.860, lng: 77.665 },
+          { lat: 12.862, lng: 77.595 }
+        ],
+        color: "#eab308"
+      },
+      {
+        name: "West Zone (Malleshwaram / Rajajinagar / Vijayanagar)",
+        coords: [
+          { lat: 13.015, lng: 77.530 },
+          { lat: 13.018, lng: 77.585 },
+          { lat: 12.955, lng: 77.580 },
+          { lat: 12.950, lng: 77.525 }
+        ],
+        color: "#38bdf8"
+      },
+      {
+        name: "Mahadevapura Zone (Whitefield / Bellandur / Marathahalli)",
+        coords: [
+          { lat: 13.010, lng: 77.670 },
+          { lat: 13.012, lng: 77.770 },
+          { lat: 12.920, lng: 77.765 },
+          { lat: 12.922, lng: 77.670 }
+        ],
+        color: "#ef4444"
+      }
+    ];
+
+    zones.forEach(z => {
+      new google.maps.Polygon({
+        paths: z.coords,
+        strokeColor: z.color,
+        strokeOpacity: 0.8,
+        strokeWeight: 1.5,
+        fillColor: z.color,
         fillOpacity: 0.08,
-        dashArray: "4, 4"
-      }).bindTooltip(`<b>${w.name}</b><br>EcoSense Monitoring Sector`, { sticky: true }).addTo(this.wardPolygonsLayer);
+        map: this.map
+      });
     });
   }
 
   setIncidents(incidents) {
-    this.incidents = incidents;
+    this.incidents = incidents || [];
     this.renderMarkers();
   }
 
@@ -74,72 +306,83 @@ export class MapRenderer {
   }
 
   renderMarkers() {
-    if (!this.markersLayer) return;
-    this.markersLayer.clearLayers();
+    if (!this.map) return;
+
+    // Clear existing markers
+    this.markers.forEach(m => m.setMap(null));
+    this.markers = [];
 
     const filtered = this.incidents.filter(inc => {
       if (this.currentFilter === "all") return true;
       if (this.currentFilter === "resolved") return inc.status === "resolved";
+      if (this.currentFilter === "fraud") return inc.fraudAlert != null;
       return inc.zone === this.currentFilter && inc.status !== "resolved";
     });
 
     filtered.forEach(inc => {
-      const pinHtml = this._getMarkerHtml(inc);
-      const icon = L.divIcon({
-        className: "custom-leaflet-pin",
-        html: pinHtml,
-        iconSize: [36, 36],
-        iconAnchor: [18, 18],
-        popupAnchor: [0, -18]
+      const color = inc.fraudAlert
+        ? "#ef4444"
+        : inc.status === "resolved"
+        ? "#10b981"
+        : inc.zone === "red"
+        ? "#ef4444"
+        : inc.zone === "orange"
+        ? "#f97316"
+        : "#eab308";
+
+      const marker = new google.maps.Marker({
+        position: { lat: inc.lat, lng: inc.lng },
+        map: this.map,
+        title: inc.location,
+        icon: {
+          path: "M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z",
+          fillColor: color,
+          fillOpacity: 0.95,
+          strokeColor: "#ffffff",
+          strokeWeight: 1.5,
+          scale: 1.6,
+          anchor: new google.maps.Point(12, 24)
+        }
       });
 
-      const marker = L.marker([inc.lat, inc.lng], { icon }).addTo(this.markersLayer);
-
-      const popupContent = `
-        <div style="font-family: sans-serif; font-size: 13px; max-width: 240px; color: #1e293b;">
-          <div style="font-weight: 800; color: ${inc.zone === 'red' ? '#dc2626' : inc.zone === 'orange' ? '#ea580c' : inc.zone === 'yellow' ? '#ca8a04' : '#059669'}; margin-bottom: 4px;">
-            ${inc.zoneTitle}
+      const infoHtml = `
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 13px; max-width: 250px; color: #0f172a; padding: 4px;">
+          <div style="font-weight: 800; color: ${color}; margin-bottom: 4px; font-size: 13px;">
+            ${inc.fraudAlert ? '🚨 FRAUD / MISMATCH ALERT' : inc.zoneTitle || inc.zone.toUpperCase()}
           </div>
-          <img src="${inc.image}" style="width: 100%; height: 90px; object-fit: cover; border-radius: 6px; margin: 4px 0;" />
-          <div style="font-weight: 700; margin-top: 4px;">${inc.location}</div>
+          ${inc.image ? `<img src="${inc.image}" style="width:100%; height:90px; object-fit:cover; border-radius:6px; margin: 4px 0;" />` : ''}
+          <div style="font-weight: 700; font-size: 13px; margin-top: 2px;">${inc.location}</div>
           <div style="font-size: 11px; color: #64748b;">${inc.society} (${inc.ward})</div>
-          <div style="margin-top: 6px; font-size: 11px; background: #f1f5f9; padding: 4px 6px; border-radius: 4px;">
-            <b>AI Volume:</b> ${inc.aiAnalysis.volumeM3} m³ (${inc.aiAnalysis.estimatedWeightKg} kg)<br>
-            <b>SLA Urgency:</b> < ${inc.slaHours} Hours
+          <div style="margin-top: 6px; font-size: 11px; background: #f1f5f9; padding: 5px 7px; border-radius: 4px;">
+            <b>Status:</b> ${inc.status.toUpperCase()} | <b>SLA:</b> < ${inc.slaHours}h
           </div>
-          <button id="popup-btn-${inc.id}" style="width: 100%; margin-top: 8px; background: #059669; color: white; border: none; padding: 5px 8px; border-radius: 4px; font-weight: bold; cursor: pointer;">
-            Inspect & Manage
+          <button id="gmap-btn-${inc.id}" style="width: 100%; margin-top: 8px; background: #059669; color: white; border: none; padding: 6px 10px; border-radius: 6px; font-weight: bold; cursor: pointer;">
+            Inspect Incident
           </button>
         </div>
       `;
 
-      marker.bindPopup(popupContent);
-      marker.on("popupopen", () => {
-        const btn = document.getElementById(`popup-btn-${inc.id}`);
-        if (btn) {
-          btn.onclick = () => {
-            if (this.onIncidentSelect) this.onIncidentSelect(inc.id);
-          };
-        }
+      marker.addListener("click", () => {
+        this.infoWindow.setContent(infoHtml);
+        this.infoWindow.open(this.map, marker);
+
+        setTimeout(() => {
+          const btn = document.getElementById(`gmap-btn-${inc.id}`);
+          if (btn) {
+            btn.onclick = () => {
+              if (this.onIncidentSelect) this.onIncidentSelect(inc.id);
+            };
+          }
+        }, 100);
       });
+
+      this.markers.push(marker);
     });
   }
 
-  _getMarkerHtml(inc) {
-    if (inc.status === "resolved") {
-      return `<div class="custom-zone-pin pin-green">✓</div>`;
-    }
-    if (inc.zone === "red") {
-      return `<div class="custom-zone-pin pin-red">🔴</div>`;
-    }
-    if (inc.zone === "orange") {
-      return `<div class="custom-zone-pin pin-orange">🟠</div>`;
-    }
-    return `<div class="custom-zone-pin pin-yellow">🟡</div>`;
-  }
-
   flyToIncident(inc) {
-    if (!this.map) return;
-    this.map.flyTo([inc.lat, inc.lng], 15, { duration: 1.2 });
+    if (!this.map || !inc) return;
+    this.map.panTo({ lat: inc.lat, lng: inc.lng });
+    this.map.setZoom(16);
   }
 }

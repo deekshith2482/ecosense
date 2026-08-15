@@ -272,43 +272,194 @@
 
   // 3. MAP RENDERER
   class MapRenderer {
+  // 3. GOOGLE MAPS GEOSPATIAL RENDERER
+  class MapRenderer {
     constructor(containerId, onSelect) {
       this.containerId = containerId;
       this.onSelect = onSelect;
       this.map = null;
-      this.markersLayer = null;
+      this.markers = [];
+      this.userLocationMarker = null;
+      this.clickPinMarker = null;
+      this.infoWindow = null;
       this.currentFilter = "all";
       this.incidents = [];
+      this.bangaloreCenter = { lat: 12.9716, lng: 77.5946 };
     }
 
     initMap() {
-      if (typeof L === "undefined") return;
-      const el = document.getElementById(this.containerId);
-      if (!el) return;
+      const container = document.getElementById(this.containerId);
+      if (!container) return;
 
-      this.map = L.map(this.containerId, { center: [12.9650, 77.6200], zoom: 12 });
-      L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", { maxZoom: 19 }).addTo(this.map);
-      this.markersLayer = L.layerGroup().addTo(this.map);
+      if (typeof google === "undefined" || !google.maps) {
+        if (window.EcoSenseMapsConfig && window.EcoSenseMapsConfig.loadGoogleMapsSDK) {
+          window.EcoSenseMapsConfig.loadGoogleMapsSDK(() => this._createGoogleMap(container));
+        } else {
+          window.addEventListener("ecosense_maps_ready", () => this._createGoogleMap(container));
+        }
+        return;
+      }
 
-      const wards = [
-        { name: "East Zone (Indiranagar / CV Raman / Ulsoor)", coords: [[12.980, 77.610], [12.995, 77.665], [12.960, 77.670], [12.955, 77.615]], color: "#10b981" },
-        { name: "South Zone (Koramangala / Jayanagar / JP Nagar)", coords: [[12.945, 77.560], [12.950, 77.640], [12.905, 77.635], [12.895, 77.565]], color: "#f97316" },
-        { name: "Bommanahalli Zone (HSR / Begur / Electronic City)", coords: [[12.920, 77.620], [12.922, 77.670], [12.860, 77.665], [12.862, 77.595]], color: "#eab308" },
-        { name: "West Zone (Malleshwaram / Rajajinagar / Vijayanagar)", coords: [[13.015, 77.530], [13.018, 77.585], [12.955, 77.580], [12.950, 77.525]], color: "#38bdf8" },
-        { name: "Mahadevapura Zone (Whitefield / Bellandur / Marathahalli)", coords: [[13.010, 77.670], [13.012, 77.770], [12.920, 77.765], [12.922, 77.670]], color: "#ef4444" },
-        { name: "Yelahanka Zone (Yelahanka Town / Jakkur / Thanisandra)", coords: [[13.125, 77.545], [13.130, 77.635], [13.045, 77.630], [13.040, 77.550]], color: "#a855f7" },
-        { name: "RR Nagar Zone (RR Nagar / Kengeri / Jnana Bharathi)", coords: [[12.985, 77.470], [12.990, 77.530], [12.890, 77.525], [12.885, 77.465]], color: "#ec4899" },
-        { name: "Dasarahalli Zone (Peenya / T. Dasarahalli / Bagalagunte)", coords: [[13.060, 77.485], [13.065, 77.535], [13.010, 77.530], [13.005, 77.480]], color: "#14b8a6" }
+      this._createGoogleMap(container);
+    }
+
+    _createGoogleMap(container) {
+      if (this.map) return;
+
+      const ecoDarkStyle = [
+        { elementType: "geometry", stylers: [{ color: "#0f2e22" }] },
+        { elementType: "labels.text.stroke", stylers: [{ color: "#041812" }] },
+        { elementType: "labels.text.fill", stylers: [{ color: "#6ee7b7" }] },
+        { featureType: "administrative.locality", elementType: "labels.text.fill", stylers: [{ color: "#a7f3d0" }] },
+        { featureType: "poi", elementType: "labels.text.fill", stylers: [{ color: "#34d399" }] },
+        { featureType: "poi.park", elementType: "geometry", stylers: [{ color: "#093829" }] },
+        { featureType: "poi.park", elementType: "labels.text.fill", stylers: [{ color: "#4ade80" }] },
+        { featureType: "road", elementType: "geometry", stylers: [{ color: "#164e3b" }] },
+        { featureType: "road", elementType: "geometry.stroke", stylers: [{ color: "#064e3b" }] },
+        { featureType: "road", elementType: "labels.text.fill", stylers: [{ color: "#a7f3d0" }] },
+        { featureType: "road.highway", elementType: "geometry", stylers: [{ color: "#047857" }] },
+        { featureType: "transit", elementType: "geometry", stylers: [{ color: "#0d3b2e" }] },
+        { featureType: "water", elementType: "geometry", stylers: [{ color: "#042018" }] },
+        { featureType: "water", elementType: "labels.text.fill", stylers: [{ color: "#38bdf8" }] }
       ];
 
-      wards.forEach(w => {
-        L.polygon(w.coords, { color: w.color, weight: 1.5, fillColor: w.color, fillOpacity: 0.08, dashArray: "4, 4" })
-         .bindTooltip(`<b>${w.name}</b>`, { sticky: true }).addTo(this.map);
+      this.map = new google.maps.Map(container, {
+        center: this.bangaloreCenter,
+        zoom: 12,
+        mapTypeId: google.maps.MapTypeId.ROADMAP,
+        mapTypeControl: true,
+        mapTypeControlOptions: {
+          style: google.maps.MapTypeControlStyle.HORIZONTAL_BAR,
+          position: google.maps.ControlPosition.TOP_LEFT
+        },
+        zoomControl: true,
+        scaleControl: true,
+        streetViewControl: true,
+        fullscreenControl: true,
+        styles: ecoDarkStyle
+      });
+
+      this.infoWindow = new google.maps.InfoWindow();
+
+      this._detectUserLocation();
+      this._bindMapClickCoordinates();
+      this.renderMarkers();
+      this._drawBangaloreZones();
+    }
+
+    _detectUserLocation() {
+      if (!navigator.geolocation || !this.map) return;
+
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const userPos = { lat: position.coords.latitude, lng: position.coords.longitude };
+          if (this.userLocationMarker) this.userLocationMarker.setMap(null);
+
+          this.userLocationMarker = new google.maps.Marker({
+            position: userPos,
+            map: this.map,
+            title: "Your Live Location (GPS Active)",
+            icon: {
+              path: google.maps.SymbolPath.CIRCLE,
+              scale: 8,
+              fillColor: "#38bdf8",
+              fillOpacity: 1,
+              strokeColor: "#ffffff",
+              strokeWeight: 2
+            },
+            zIndex: 999
+          });
+
+          this._updateReportingGpsLabel(userPos.lat, userPos.lng, "📍 Live GPS Locked (User Location)");
+        },
+        (error) => {
+          console.log("ℹ️ Geolocation permission notice:", error.message);
+        },
+        { enableHighAccuracy: true, timeout: 8000 }
+      );
+    }
+
+    _bindMapClickCoordinates() {
+      if (!this.map) return;
+
+      this.map.addListener("click", (e) => {
+        const clickedLat = +e.latLng.lat().toFixed(5);
+        const clickedLng = +e.latLng.lng().toFixed(5);
+
+        if (!this.clickPinMarker) {
+          this.clickPinMarker = new google.maps.Marker({
+            position: { lat: clickedLat, lng: clickedLng },
+            map: this.map,
+            title: "Selected Incident Location",
+            animation: google.maps.Animation.DROP,
+            icon: {
+              path: "M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z",
+              fillColor: "#10b981",
+              fillOpacity: 1,
+              strokeColor: "#ffffff",
+              strokeWeight: 1.5,
+              scale: 1.5,
+              anchor: new google.maps.Point(12, 24)
+            }
+          });
+        } else {
+          this.clickPinMarker.setPosition({ lat: clickedLat, lng: clickedLng });
+        }
+
+        this._updateReportingGpsLabel(clickedLat, clickedLng, `📍 Map Picked: ${clickedLat}° N, ${clickedLng}° E`);
+      });
+    }
+
+    _updateReportingGpsLabel(lat, lng, labelText) {
+      const gpsBadge = document.getElementById("gps-coords-label");
+      if (gpsBadge) {
+        gpsBadge.setAttribute("data-lat", lat);
+        gpsBadge.setAttribute("data-lng", lng);
+        gpsBadge.textContent = labelText || `📍 Coordinates: ${lat}° N, ${lng}° E`;
+      }
+    }
+
+    _drawBangaloreZones() {
+      if (!this.map) return;
+
+      const zones = [
+        {
+          coords: [{ lat: 12.980, lng: 77.610 }, { lat: 12.995, lng: 77.665 }, { lat: 12.960, lng: 77.670 }, { lat: 12.955, lng: 77.615 }],
+          color: "#10b981"
+        },
+        {
+          coords: [{ lat: 12.945, lng: 77.560 }, { lat: 12.950, lng: 77.640 }, { lat: 12.905, lng: 77.635 }, { lat: 12.895, lng: 77.565 }],
+          color: "#f97316"
+        },
+        {
+          coords: [{ lat: 12.920, lng: 77.620 }, { lat: 12.922, lng: 77.670 }, { lat: 12.860, lng: 77.665 }, { lat: 12.862, lng: 77.595 }],
+          color: "#eab308"
+        },
+        {
+          coords: [{ lat: 13.015, lng: 77.530 }, { lat: 13.018, lng: 77.585 }, { lat: 12.955, lng: 77.580 }, { lat: 12.950, lng: 77.525 }],
+          color: "#38bdf8"
+        },
+        {
+          coords: [{ lat: 13.010, lng: 77.670 }, { lat: 13.012, lng: 77.770 }, { lat: 12.920, lng: 77.765 }, { lat: 12.922, lng: 77.670 }],
+          color: "#ef4444"
+        }
+      ];
+
+      zones.forEach(z => {
+        new google.maps.Polygon({
+          paths: z.coords,
+          strokeColor: z.color,
+          strokeOpacity: 0.8,
+          strokeWeight: 1.5,
+          fillColor: z.color,
+          fillOpacity: 0.08,
+          map: this.map
+        });
       });
     }
 
     setIncidents(incidents) {
-      this.incidents = incidents;
+      this.incidents = incidents || [];
       this.renderMarkers();
     }
 
@@ -318,8 +469,10 @@
     }
 
     renderMarkers() {
-      if (!this.markersLayer) return;
-      this.markersLayer.clearLayers();
+      if (!this.map) return;
+
+      this.markers.forEach(m => m.setMap(null));
+      this.markers = [];
 
       const filtered = this.incidents.filter(inc => {
         if (this.currentFilter === "all") return true;
@@ -329,39 +482,62 @@
       });
 
       filtered.forEach(inc => {
-        const pinHtml = inc.fraudAlert
-          ? `<div class="custom-zone-pin pin-red" style="background:#000; border-color:#ef4444;">🚨</div>`
-          : inc.status === "resolved" ? `<div class="custom-zone-pin pin-green">✓</div>`
-          : inc.zone === "red" ? `<div class="custom-zone-pin pin-red">🔴</div>`
-          : inc.zone === "orange" ? `<div class="custom-zone-pin pin-orange">🟠</div>`
-          : `<div class="custom-zone-pin pin-yellow">🟡</div>`;
+        const color = inc.fraudAlert
+          ? "#ef4444"
+          : inc.status === "resolved"
+          ? "#10b981"
+          : inc.zone === "red"
+          ? "#ef4444"
+          : inc.zone === "orange"
+          ? "#f97316"
+          : "#eab308";
 
-        const icon = L.divIcon({ className: "custom-leaflet-pin", html: pinHtml, iconSize: [36, 36], iconAnchor: [18, 18], popupAnchor: [0, -18] });
-        const marker = L.marker([inc.lat, inc.lng], { icon }).addTo(this.markersLayer);
+        const marker = new google.maps.Marker({
+          position: { lat: inc.lat, lng: inc.lng },
+          map: this.map,
+          title: inc.location,
+          icon: {
+            path: "M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z",
+            fillColor: color,
+            fillOpacity: 0.95,
+            strokeColor: "#ffffff",
+            strokeWeight: 1.5,
+            scale: 1.6,
+            anchor: new google.maps.Point(12, 24)
+          }
+        });
 
-        marker.bindPopup(`
-          <div style="font-size: 13px; max-width: 240px; color: #1e293b;">
-            <div style="font-weight: 800; color: ${inc.fraudAlert ? '#ef4444' : inc.zone === 'red' ? '#dc2626' : inc.zone === 'orange' ? '#ea580c' : '#059669'};">
-              ${inc.fraudAlert ? '🚨 SERVER ROOM ESCALATION' : inc.zoneTitle}
+        const infoHtml = `
+          <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 13px; max-width: 240px; color: #0f172a; padding: 4px;">
+            <div style="font-weight: 800; color: ${color}; margin-bottom: 4px;">
+              ${inc.fraudAlert ? '🚨 SERVER ROOM ESCALATION' : inc.zoneTitle || inc.zone.toUpperCase()}
             </div>
-            <img src="${inc.image}" style="width:100%; height:85px; object-fit:cover; border-radius:4px; margin:4px 0;" />
+            ${inc.image ? `<img src="${inc.image}" style="width:100%; height:85px; object-fit:cover; border-radius:4px; margin:4px 0;" />` : ''}
             <div style="font-weight:700;">${inc.location}</div>
             <div style="font-size:11px; color:#64748b;">${inc.society} (${inc.ward})</div>
-            <button id="pop-btn-${inc.id}" style="width:100%; margin-top:6px; background:#059669; color:#fff; border:none; padding:4px 6px; border-radius:4px; font-weight:bold; cursor:pointer;">
+            <button id="gmap-btn-${inc.id}" style="width:100%; margin-top:6px; background:#059669; color:#fff; border:none; padding:5px 8px; border-radius:4px; font-weight:bold; cursor:pointer;">
               Inspect & Manage
             </button>
           </div>
-        `);
+        `;
 
-        marker.on("popupopen", () => {
-          const btn = document.getElementById(`pop-btn-${inc.id}`);
-          if (btn) btn.onclick = () => this.onSelect && this.onSelect(inc.id);
+        marker.addListener("click", () => {
+          this.infoWindow.setContent(infoHtml);
+          this.infoWindow.open(this.map, marker);
+          setTimeout(() => {
+            const btn = document.getElementById(`gmap-btn-${inc.id}`);
+            if (btn) btn.onclick = () => this.onSelect && this.onSelect(inc.id);
+          }, 100);
         });
+
+        this.markers.push(marker);
       });
     }
 
     flyToIncident(inc) {
-      if (this.map) this.map.flyTo([inc.lat, inc.lng], 15, { duration: 1 });
+      if (!this.map || !inc) return;
+      this.map.panTo({ lat: inc.lat, lng: inc.lng });
+      this.map.setZoom(16);
     }
   }
 
