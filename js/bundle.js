@@ -545,7 +545,171 @@
     }
   }
 
-  // 4. MAIN APPLICATION
+  // 4. BBMP MUNICIPAL ANALYTICS DASHBOARD (Chart.js)
+  class AnalyticsDashboard {
+    constructor(app) {
+      this.app = app;
+      this.chartWard = null;
+      this.chartComposition = null;
+      this.chartZones = null;
+    }
+
+    renderCharts() {
+      if (typeof Chart === "undefined") {
+        console.warn("Chart.js not loaded.");
+        return;
+      }
+      this._renderWardChart();
+      this._renderCompositionChart();
+      this._renderZoneDistribution();
+    }
+
+    _renderWardChart() {
+      const ctx = document.getElementById("chart-ward-performance");
+      if (!ctx) return;
+
+      if (this.chartWard) {
+        try { this.chartWard.destroy(); } catch (e) {}
+      }
+
+      const wards = ["Indiranagar", "Koramangala", "HSR Layout", "Malleshwaram", "Whitefield", "Jayanagar"];
+      const reportedData = [14, 11, 8, 5, 18, 7];
+      const resolvedData = [12, 9, 7, 5, 13, 6];
+
+      this.chartWard = new Chart(ctx, {
+        type: "bar",
+        data: {
+          labels: wards,
+          datasets: [
+            {
+              label: "Reported Spots",
+              data: reportedData,
+              backgroundColor: "rgba(239, 68, 68, 0.75)",
+              borderRadius: 6
+            },
+            {
+              label: "Cleared by BBMP",
+              data: resolvedData,
+              backgroundColor: "rgba(16, 185, 129, 0.85)",
+              borderRadius: 6
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              labels: {
+                color: "#a7f3d0",
+                font: { family: "Plus Jakarta Sans", weight: 600 }
+              }
+            }
+          },
+          scales: {
+            x: {
+              ticks: { color: "#6ee7b7" },
+              grid: { color: "rgba(52, 211, 153, 0.1)" }
+            },
+            y: {
+              ticks: { color: "#6ee7b7" },
+              grid: { color: "rgba(52, 211, 153, 0.1)" }
+            }
+          }
+        }
+      });
+    }
+
+    _renderCompositionChart() {
+      const ctx = document.getElementById("chart-waste-composition");
+      if (!ctx) return;
+
+      if (this.chartComposition) {
+        try { this.chartComposition.destroy(); } catch (e) {}
+      }
+
+      this.chartComposition = new Chart(ctx, {
+        type: "doughnut",
+        data: {
+          labels: [
+            "Plastics & Packaging (48%)",
+            "Organic / Wet Waste (34%)",
+            "Construction / Inerts (12%)",
+            "Hazardous / Bio (6%)"
+          ],
+          datasets: [
+            {
+              data: [48, 34, 12, 6],
+              backgroundColor: ["#38bdf8", "#10b981", "#fbbf24", "#ef4444"],
+              borderWidth: 0
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              position: "right",
+              labels: {
+                color: "#a7f3d0",
+                font: { family: "Plus Jakarta Sans", weight: 600 }
+              }
+            }
+          }
+        }
+      });
+    }
+
+    _renderZoneDistribution() {
+      const incidents = this.app.incidents || [];
+      const redCount = incidents.filter(i => i.zone === "red" && i.status !== "resolved").length || 2;
+      const orangeCount = incidents.filter(i => i.zone === "orange" && i.status !== "resolved").length || 3;
+      const yellowCount = incidents.filter(i => i.zone === "yellow" && i.status !== "resolved").length || 1;
+      const resolvedCount = incidents.filter(i => i.status === "resolved").length || 4;
+
+      const ctx = document.getElementById("chart-zone-distribution");
+      if (!ctx) return;
+
+      if (this.chartZones) {
+        try { this.chartZones.destroy(); } catch (e) {}
+      }
+
+      this.chartZones = new Chart(ctx, {
+        type: "pie",
+        data: {
+          labels: [
+            "🔴 Red (Critical)",
+            "🟠 Orange (Moderate)",
+            "🟡 Yellow (Minor)",
+            "🟢 Resolved (Clean)"
+          ],
+          datasets: [
+            {
+              data: [redCount, orangeCount, yellowCount, resolvedCount],
+              backgroundColor: ["#ef4444", "#f97316", "#eab308", "#10b981"],
+              borderWidth: 0
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              position: "right",
+              labels: {
+                color: "#a7f3d0",
+                font: { family: "Plus Jakarta Sans", weight: 600 }
+              }
+            }
+          }
+        }
+      });
+    }
+  }
+
+  // 5. MAIN APPLICATION
   class EcoSenseApp {
     constructor() {
       this.storageKey = "ecosense_state_v2";
@@ -554,6 +718,7 @@
       this.citizenReportsCount = 3;
       this.aiEngine = new AIVisionEngine();
       this.mapRenderer = null;
+      this.analyticsDashboard = new AnalyticsDashboard(this);
       this.currentImage = null;
       this.currentAiResult = null;
       this.activeIncident = null;
@@ -745,6 +910,7 @@
       this.renderServerRoomAlerts();
       this.renderMapSidebar();
       if (this.mapRenderer) this.mapRenderer.setIncidents(this.incidents);
+      if (this.analyticsDashboard) this.analyticsDashboard.renderCharts();
     }
 
     _bindNavigation() {
@@ -790,6 +956,12 @@
             }
           }
           this.renderMapSidebar();
+        }, 100);
+      }
+
+      if (viewId === "analytics-view" || viewId === "bbmp-view") {
+        setTimeout(() => {
+          if (this.analyticsDashboard) this.analyticsDashboard.renderCharts();
         }, 100);
       }
     }
