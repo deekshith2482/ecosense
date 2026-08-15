@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EcoSense - Citizen & Resident Login</title>
+  <meta name="description" content="Login to EcoSense Citizen Portal to report garbage, track society cleanups, and earn EcoPoints.">
+
+  <link rel="stylesheet" href="styles/main.css">
+  <style>
+    .auth-page-wrapper {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem 1.5rem;
+    }
+    .auth-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-xl);
+      max-width: 480px;
+      width: 100%;
+      padding: 2.5rem 2rem;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6), var(--shadow-glow-emerald);
+      position: relative;
+    }
+    .auth-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: 0.75rem;
+      font-weight: 800;
+      color: #34d399;
+      background: rgba(16, 185, 129, 0.2);
+      padding: 0.25rem 0.65rem;
+      border-radius: var(--radius-full);
+      border: 1px solid rgba(52, 211, 153, 0.4);
+      margin-bottom: 1rem;
+    }
+    .quick-demo-login {
+      background: rgba(4, 24, 18, 0.7);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 1rem;
+      margin-top: 1.5rem;
+    }
+    .demo-user-btn {
+      width: 100%;
+      background: var(--bg-surface-elevated);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-primary);
+      padding: 0.6rem 0.85rem;
+      border-radius: var(--radius-md);
+      cursor: pointer;
+      font-size: 0.8125rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 0.5rem;
+      transition: all 0.2s ease;
+    }
+    .demo-user-btn:hover {
+      border-color: var(--brand-400);
+      background: rgba(16, 185, 129, 0.15);
+      color: #fff;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="auth-page-wrapper">
+    <div class="auth-card">
+      <div style="text-align: center; margin-bottom: 1.5rem;">
+        <div class="brand-icon" style="margin: 0 auto 0.75rem; width: 48px; height: 48px; font-size: 1.6rem;">🌱</div>
+        <span class="auth-badge">👤 CITIZEN & RESIDENT PORTAL</span>
+        <h2 style="font-size: 1.5rem; color: #f0fdf4;">Welcome to EcoSense</h2>
+        <p style="font-size: 0.875rem; color: var(--text-secondary); margin-top: 0.25rem;">
+          Report neighborhood garbage, track AI analysis, and earn EcoPoints.
+        </p>
+      </div>
+
+      <form id="citizen-login-form" onsubmit="handleCitizenLogin(event)">
+        <div class="form-group">
+          <label class="form-label">Mobile Number or Email</label>
+          <input type="text" id="citizen-auth-input" class="form-input" placeholder="+91 98765 43210 or resident@society.org" value="+91 98450 11920" required />
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Password / OTP</label>
+          <input type="password" id="citizen-pass-input" class="form-input" placeholder="••••••••" value="ecosense2026" required />
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Select Your Residential Ward</label>
+          <select id="citizen-auth-ward" class="form-select">
+            <option value="Ward 112 - Domlur / Indiranagar">Ward 112 - Domlur / Indiranagar (East)</option>
+            <option value="Ward 151 - Koramangala">Ward 151 - Koramangala (South)</option>
+            <option value="Ward 174 - HSR Layout">Ward 174 - HSR Layout (Bommanahalli)</option>
+            <option value="Ward 45 - Malleshwaram">Ward 45 - Malleshwaram (West)</option>
+            <option value="Ward 84 - Whitefield">Ward 84 - Whitefield (Mahadevapura)</option>
+          </select>
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-block" style="margin-top: 1.5rem;">
+          🚀 Secure Citizen Login
+        </button>
+      </form>
+
+      <!-- Quick 1-Click Demo Profiles -->
+      <div class="quick-demo-login">
+        <div style="font-size: 0.75rem; font-weight: 700; color: var(--text-tertiary); text-transform: uppercase;">
+          ⚡ Instant 1-Click Demo Resident Logins:
+        </div>
+        <button type="button" class="demo-user-btn" onclick="quickLoginCitizen('Priya Sharma', 'Indiranagar Central Society', 'Ward 112 - Domlur / Indiranagar', 380, 'Level 3 Eco-Leader')">
+          <span>👩 <b>Priya Sharma</b> (Indiranagar)</span>
+          <span style="color: #fde047;">🪙 380 pts</span>
+        </button>
+        <button type="button" class="demo-user-btn" onclick="quickLoginCitizen('Rahul Menon', 'Green Glen Meadows', 'Ward 151 - Koramangala', 250, 'Level 2 Green Scout')">
+          <span>👨 <b>Rahul Menon</b> (Koramangala)</span>
+          <span style="color: #fde047;">🪙 250 pts</span>
+        </button>
+        <button type="button" class="demo-user-btn" onclick="quickLoginCitizen('Vikram Iyengar', 'Sri Krishna Apartments', 'Ward 45 - Malleshwaram', 520, 'Level 5 Eco-Champion')">
+          <span>👨 <b>Vikram Iyengar</b> (Malleshwaram)</span>
+          <span style="color: #fde047;">🪙 520 pts</span>
+        </button>
+      </div>
+
+      <div style="margin-top: 1.5rem; text-align: center; border-top: 1px solid var(--border-subtle); padding-top: 1rem;">
+        <span style="font-size: 0.8125rem; color: var(--text-tertiary);">Are you a BBMP Sanitation Official?</span><br>
+        <a href="login-bbmp.html" style="font-weight: 700; color: #38bdf8; font-size: 0.875rem; display: inline-block; margin-top: 0.35rem;">
+          🏛️ Go to BBMP Officer Login Portal &rarr;
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function handleCitizenLogin(e) {
+      e.preventDefault();
+      const identifier = document.getElementById("citizen-auth-input").value;
+      const ward = document.getElementById("citizen-auth-ward").value;
+      
+      const user = {
+        role: "citizen",
+        name: identifier.includes("@") ? identifier.split("@")[0] : "Verified Citizen",
+        phoneOrEmail: identifier,
+        ward: ward,
+        society: "Green Valley Residents Society",
+        ecoPoints: 250,
+        rank: "Level 3 Green Scout",
+        loginTime: Date.now()
+      };
+
+      localStorage.setItem("ecosense_auth_user", JSON.stringify(user));
+      window.location.href = "citizen.html";
+    }
+
+    function quickLoginCitizen(name, society, ward, points, rank) {
+      const user = {
+        role: "citizen",
+        name: name,
+        society: society,
+        ward: ward,
+        ecoPoints: points,
+        rank: rank,
+        loginTime: Date.now()
+      };
+      localStorage.setItem("ecosense_auth_user", JSON.stringify(user));
+      window.location.href = "citizen.html";
+    }
+  </script>
+</body>
+</html>

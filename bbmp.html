@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EcoSense - BBMP Municipal Waste Operations War Room</title>
+  <meta name="description" content="BBMP Municipal Solid Waste Command Center. Real-time garbage incident triage, auto-tipper dispatch, ward heatmaps, and proof-of-clearance verification.">
+
+  <link rel="stylesheet" href="styles/main.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+
+  <!-- Auth Guard: Redirect to BBMP Login if not logged in -->
+  <script>
+    if (!localStorage.getItem("ecosense_auth_user")) {
+      window.location.href = "login-bbmp.html";
+    }
+  </script>
+</head>
+<body>
+
+  <!-- Dedicated BBMP Authority Header -->
+  <header class="site-header">
+    <div class="header-brand">
+      <div class="brand-icon" style="background: linear-gradient(135deg, #0284c7, #0369a1);">🏛️</div>
+      <div class="brand-text">
+        <h1>BBMP SWM <span class="brand-tag" style="border-color: #38bdf8; color: #38bdf8; background: rgba(56, 189, 248, 0.15);">War Room</span></h1>
+      </div>
+    </div>
+
+    <!-- Navigation -->
+    <nav class="header-nav">
+      <button class="nav-tab active" data-view="bbmp-view">
+        <span>📋</span> Incident Triage
+      </button>
+      <button class="nav-tab" data-view="map-view">
+        <span>🗺️</span> GIS Hotspot Map
+      </button>
+      <button class="nav-tab" data-view="analytics-view">
+        <span>📊</span> Ward SLA Analytics
+      </button>
+    </nav>
+
+    <!-- Header Actions -->
+    <div class="header-actions">
+      <button id="btn-toggle-stream" class="btn btn-secondary" style="padding: 0.4rem 0.75rem; font-size: 0.75rem; border-color: #10b981; color: #34d399;" onclick="window.ecoApp.toggleLiveTelemetry()">
+        📡 24/7 Live Stream: <b id="stream-status-label">ACTIVE</b>
+      </button>
+      <div id="bbmp-profile-pill" class="meta-chip" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; font-weight: 700; border: 1px solid rgba(56, 189, 248, 0.4);">
+        👮‍♂️ <span id="officer-display-name">Officer S. Kumar</span>
+      </div>
+      <a href="login-bbmp.html" onclick="localStorage.removeItem('ecosense_auth_user')" class="btn btn-secondary" style="padding: 0.4rem 0.75rem; font-size: 0.75rem; text-decoration: none;">
+        🚪 Logout
+      </a>
+      <a href="citizen.html" target="_blank" class="btn btn-secondary" style="padding: 0.4rem 0.75rem; font-size: 0.75rem; text-decoration: none; color: var(--brand-400);">
+        👤 Citizen View ↗
+      </a>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="main-container">
+
+    <!-- =========================================================================
+         BBMP MUNICIPAL OPERATIONS WAR ROOM
+         ========================================================================= -->
+    <section id="bbmp-view" class="view-section active">
+      <!-- BBMP Operations Bar -->
+      <div class="bbmp-toolbar">
+        <div style="display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;">
+          <span class="bbmp-badge-tag">🏛️ Bruhat Bengaluru Mahanagara Palike</span>
+          <span style="font-size: 0.875rem; color: var(--text-secondary);">Solid Waste Management Operations Command</span>
+        </div>
+        <div style="display: flex; gap: 0.5rem;">
+          <select id="bbmp-ward-filter" class="form-select" style="width: auto; padding: 0.45rem 0.9rem; font-size: 0.8125rem;">
+            <option value="all">All Bangalore Wards</option>
+            <option value="Indiranagar">Ward 112 - Indiranagar</option>
+            <option value="Koramangala">Ward 151 - Koramangala</option>
+            <option value="HSR Layout">Ward 174 - HSR Layout</option>
+            <option value="Malleshwaram">Ward 45 - Malleshwaram</option>
+            <option value="Whitefield">Ward 84 - Whitefield</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- KPI Metrics -->
+      <div class="banner-grid">
+        <div class="stat-card">
+          <div class="stat-icon red">🔴</div>
+          <div class="stat-data">
+            <h3 id="bbmp-metric-red">2</h3>
+            <p>Red Critical Hotspots (&lt;4h SLA)</p>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon orange">🟠</div>
+          <div class="stat-data">
+            <h3 id="bbmp-metric-orange">2</h3>
+            <p>Orange Moderate Piles (&lt;12h SLA)</p>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon yellow">🟡</div>
+          <div class="stat-data">
+            <h3 id="bbmp-metric-yellow">1</h3>
+            <p>Yellow Minor Spots (&lt;24h SLA)</p>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon green">🚛</div>
+          <div class="stat-data">
+            <h3 id="bbmp-metric-tonnage">4.20 MT</h3>
+            <p>Cleared Today by BBMP</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Zone Filter Tabs -->
+      <div style="display: flex; gap: 0.5rem; margin-bottom: 1.25rem; flex-wrap: wrap;">
+        <button class="bbmp-filter-btn filter-btn active" data-filter="all">All Incidents</button>
+        <button class="bbmp-filter-btn filter-btn filter-red" data-filter="red">🔴 Red Zones (Critical)</button>
+        <button class="bbmp-filter-btn filter-btn filter-orange" data-filter="orange">🟠 Orange Zones (Moderate)</button>
+        <button class="bbmp-filter-btn filter-btn filter-yellow" data-filter="yellow">🟡 Yellow Zones (Minor)</button>
+        <button class="bbmp-filter-btn filter-btn filter-green" data-filter="resolved">🟢 Resolved / Cleaned (<span id="bbmp-metric-resolved">1</span>)</button>
+      </div>
+
+      <!-- Server Room Live Alerts Bar -->
+      <div id="server-room-alert-container"></div>
+
+      <!-- Incident Dispatch Grid -->
+      <div id="bbmp-incident-grid" class="bbmp-grid">
+        <!-- Rendered by JS -->
+      </div>
+    </section>
+
+    <!-- Map View -->
+    <section id="map-view" class="view-section">
+      <div class="map-view-wrapper">
+        <div class="map-card">
+          <div class="map-floating-controls">
+            <button class="map-filter-btn filter-btn active" data-filter="all">All Zones</button>
+            <button class="map-filter-btn filter-btn filter-red" data-filter="red">🔴 Red Zones</button>
+            <button class="map-filter-btn filter-btn filter-orange" data-filter="orange">🟠 Orange Zones</button>
+            <button class="map-filter-btn filter-btn filter-yellow" data-filter="yellow">🟡 Yellow Zones</button>
+            <button class="map-filter-btn filter-btn filter-green" data-filter="resolved">🟢 Resolved</button>
+          </div>
+          <div id="leaflet-map"></div>
+        </div>
+
+        <div class="map-sidebar">
+          <div class="sidebar-header">
+            <h3 style="font-size: 1rem; color: #f0fdf4;">Bangalore Hotspots</h3>
+            <span style="font-size: 0.75rem; color: var(--brand-400); font-weight: 700;">Live Feed</span>
+          </div>
+          <div id="map-sidebar-list" class="sidebar-incidents-list"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Analytics View -->
+    <section id="analytics-view" class="view-section">
+      <div class="charts-grid">
+        <div class="chart-container">
+          <h3 style="margin-bottom: 1rem; font-size: 1.1rem; color:#f0fdf4;">Ward-Wise Garbage Density & BBMP Clearance</h3>
+          <div style="height: 280px; position: relative;">
+            <canvas id="chart-ward-performance"></canvas>
+          </div>
+        </div>
+
+        <div class="chart-container">
+          <h3 style="margin-bottom: 1rem; font-size: 1.1rem; color:#f0fdf4;">City-Wide Waste Material Composition</h3>
+          <div style="height: 280px; position: relative;">
+            <canvas id="chart-waste-composition"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <div class="charts-grid" style="margin-top: 1.5rem;">
+        <div class="chart-container">
+          <h3 style="margin-bottom: 1rem; font-size: 1.1rem; color:#f0fdf4;">Zone Severity Breakdown</h3>
+          <div style="height: 260px; position: relative;">
+            <canvas id="chart-zone-distribution"></canvas>
+          </div>
+        </div>
+
+        <div class="chart-container" style="display: flex; flex-direction: column; justify-content: center;">
+          <h3 style="margin-bottom: 0.75rem; font-size: 1.1rem; color:#f0fdf4;">BBMP SLA Compliance Index</h3>
+          <div style="display: flex; align-items: baseline; gap: 0.5rem; margin-bottom: 0.5rem;">
+            <span style="font-size: 3rem; font-weight: 800; color: var(--brand-400);">94.8%</span>
+            <span style="color: var(--text-secondary); font-size: 0.875rem;">On-Time Turnaround</span>
+          </div>
+          <p style="font-size: 0.8125rem; line-height: 1.6;">
+            Average Red-Zone response time: <b>2.4 hours</b> (Target: &lt; 4 hours). Total cleanups executed this week across 8 wards: <b>142 blackspots</b>.
+          </p>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Incident Details Modal -->
+  <div id="modal-incident-detail" class="modal-overlay">
+    <div class="modal-card">
+      <button class="modal-close-btn">&times;</button>
+      <h3 id="modal-inc-title" style="font-size: 1.25rem; margin-bottom: 0.25rem; color:#f0fdf4;">Incident Details</h3>
+      <p id="modal-inc-society" style="font-size: 0.875rem; color: var(--text-tertiary); margin-bottom: 1rem;">Society details</p>
+
+      <div id="modal-compare-wrapper" style="display: none;">
+        <div style="display: flex; justify-content: space-between; font-size: 0.75rem; font-weight: 700; color: var(--text-secondary); margin-bottom: 0.35rem;">
+          <span>📸 BEFORE (Reported Garbage)</span>
+          <span>🟢 AFTER (Cleaned by BBMP)</span>
+        </div>
+        <div class="compare-container">
+          <img id="compare-after-img" class="compare-img" alt="Cleaned street" />
+          <div id="compare-overlay-box" class="compare-overlay">
+            <img id="compare-before-img" alt="Reported dump" />
+          </div>
+          <input type="range" min="0" max="100" value="50" class="compare-slider-input" id="compare-slider-input" />
+        </div>
+      </div>
+
+      <div id="modal-single-image-wrapper">
+        <div style="width: 100%; aspect-ratio: 16/10; border-radius: var(--radius-lg); overflow: hidden; background: #02120e; margin-bottom: 1rem;">
+          <img id="modal-single-img" style="width: 100%; height: 100%; object-fit: cover;" alt="Garbage image" />
+        </div>
+      </div>
+
+      <p id="modal-inc-desc" style="font-size: 0.875rem; margin-bottom: 1rem; line-height: 1.5;"></p>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; background: var(--bg-surface-elevated); padding: 0.85rem; border-radius: var(--radius-md); margin-bottom: 1.25rem;">
+        <div><b>AI Confidence:</b> <span id="modal-ai-conf">96%</span></div>
+        <div><b>Estimated Vol:</b> <span id="modal-ai-vol">4.2 m³</span></div>
+        <div><b>Estimated Weight:</b> <span id="modal-ai-wt">~500 kg</span></div>
+        <div><b>Hazard Index:</b> <span id="modal-ai-hazard" style="color: #ef4444;">8.5/10</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Dispatch Modal -->
+  <div id="modal-dispatch" class="modal-overlay">
+    <div class="modal-card" style="max-width: 500px;">
+      <button class="modal-close-btn">&times;</button>
+      <h3 style="font-size: 1.25rem; margin-bottom: 0.25rem; color:#f0fdf4;">Dispatch Sanitation Unit</h3>
+      <p id="dispatch-modal-loc" style="font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 1rem;"></p>
+      
+      <div style="margin-bottom: 1rem;">
+        <span id="dispatch-modal-zone" class="meta-chip" style="font-weight: 800; font-size: 0.8125rem;"></span>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Select Available BBMP Unit / Auto-Tipper:</label>
+        <select id="modal-crew-select" class="form-select">
+          <!-- Populated by JS -->
+        </select>
+      </div>
+
+      <div style="margin-top: 1.5rem; display: flex; justify-content: flex-end; gap: 0.75rem;">
+        <button class="btn btn-secondary" onclick="document.getElementById('modal-dispatch').classList.remove('active')">Cancel</button>
+        <button id="btn-confirm-dispatch" class="btn btn-primary">Confirm & Dispatch</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: AI Anti-Fraud & Resolution Proof Verification -->
+  <div id="modal-resolution" class="modal-overlay">
+    <div class="modal-card" style="max-width: 620px;">
+      <button class="modal-close-btn">&times;</button>
+      <h3 style="font-size: 1.25rem; margin-bottom: 0.25rem; color:#f0fdf4;">📸 AI Verification of Cleanup Proof</h3>
+      <p id="resolution-modal-loc" style="font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 1rem;"></p>
+
+      <!-- Before and After Photos -->
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 1rem;">
+        <div>
+          <div style="font-size: 0.75rem; font-weight: 700; color: #f87171; margin-bottom: 0.25rem;">BEFORE (REPORTED DUMP)</div>
+          <img id="resolution-before-thumb" style="width: 100%; height: 120px; object-fit: cover; border-radius: 6px; border:1px solid rgba(239,68,68,0.4);" alt="Before" />
+        </div>
+        <div>
+          <div style="font-size: 0.75rem; font-weight: 700; color: #34d399; margin-bottom: 0.25rem;">AFTER (WORKER PROOF)</div>
+          <img id="resolution-proof-preview" style="width: 100%; height: 120px; object-fit: cover; border-radius: 6px; border:1px solid rgba(52,211,153,0.4);" alt="Cleaned Proof" />
+        </div>
+      </div>
+
+      <!-- Test Presets to Simulate Genuine vs Fake vs Incomplete -->
+      <div style="background: rgba(4,24,18,0.6); padding: 0.75rem; border-radius: var(--radius-md); border: 1px solid var(--border-subtle); margin-bottom: 1rem;">
+        <div style="font-size: 0.75rem; font-weight: 700; color: var(--text-secondary); margin-bottom: 0.4rem;">
+          🧪 Simulate Worker Upload Scenario (Test AI Fraud Detection):
+        </div>
+        <div style="display: flex; gap: 0.4rem; flex-wrap: wrap;">
+          <button class="proof-preset-btn preset-pill" data-type="passed" style="border-color:#10b981; color:#34d399;">
+            ✅ Genuine 100% Cleaned
+          </button>
+          <button class="proof-preset-btn preset-pill" data-type="incomplete" style="border-color:#f97316; color:#fb923c;">
+            ⚠️ Incomplete / Dirty (Residual Waste)
+          </button>
+          <button class="proof-preset-btn preset-pill" data-type="fake" style="border-color:#ef4444; color:#f87171;">
+            🚨 Fake / Mismatched Image (Fraud Alert)
+          </button>
+        </div>
+      </div>
+
+      <!-- Verification Result Box -->
+      <div id="proof-verification-result" class="verification-result-box" style="display: none;"></div>
+
+      <div style="margin-top: 1.25rem; display: flex; justify-content: space-between; align-items: center;">
+        <button id="btn-verify-proof-ai" class="btn btn-secondary" style="font-size: 0.8125rem;">
+          ⚡ Run AI Cleanliness & Fraud Scan
+        </button>
+        <div style="display: flex; gap: 0.5rem;">
+          <button class="btn btn-secondary" onclick="document.getElementById('modal-resolution').classList.remove('active')">Cancel</button>
+          <button id="btn-confirm-resolve" class="btn btn-primary" style="background: var(--zone-green);" disabled>
+            ✓ Approve & Close Ticket
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast-container" class="toast-container"></div>
+
+  <!-- Scripts -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="js/bundle.js"></script>
+</body>
+</html>

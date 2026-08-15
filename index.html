@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EcoSense - AI-Powered Citizen Waste Reporting & BBMP Action Platform</title>
+  <meta name="description" content="Community-driven AI waste detection platform. Citizens report garbage; AI classifies Red, Orange, and Yellow zones; BBMP dispatches sanitation crews with proof of clearance.">
+
+  <!-- Stylesheets -->
+  <link rel="stylesheet" href="styles/main.css">
+  
+  <!-- Leaflet GIS Map CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+
+  <!-- Auth Gateway Guard: Redirect to Login Gateway if not logged in -->
+  <script>
+    if (!localStorage.getItem("ecosense_auth_user") && !window.location.search.includes("demo=true")) {
+      window.location.href = "login.html";
+    }
+  </script>
+</head>
+<body>
+
+  <!-- Site Header -->
+  <header class="site-header">
+    <div class="header-brand">
+      <div class="brand-icon">🌱</div>
+      <div class="brand-text">
+        <h1>EcoSense <span class="brand-tag">AI Vision</span></h1>
+      </div>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <nav class="header-nav">
+      <button class="nav-tab active" data-view="citizen-view">
+        <span>📸</span> Citizen Portal
+      </button>
+      <button class="nav-tab" data-view="bbmp-view">
+        <span>🏛️</span> BBMP War Room
+      </button>
+      <button class="nav-tab" data-view="map-view">
+        <span>🗺️</span> Live City Map
+      </button>
+      <button class="nav-tab" data-view="analytics-view">
+        <span>📊</span> Ward Analytics
+      </button>
+      <button class="nav-tab" data-view="ai-sandbox">
+        <span>🔬</span> AI Engine
+      </button>
+    </nav>
+
+    <!-- Role Switcher & EcoPoints -->
+    <div class="header-actions">
+      <div class="role-toggle-wrapper">
+        <button id="role-btn-citizen" class="role-btn active citizen-role">
+          👤 Citizen
+        </button>
+        <button id="role-btn-bbmp" class="role-btn bbmp-role">
+          🚛 BBMP Official
+        </button>
+      </div>
+
+      <div class="ecopoints-pill">
+        <span>🪙</span> <span id="header-ecopoints-val">250</span> pts
+      </div>
+    </div>
+  </header>
+
+  <!-- Main View Container -->
+  <main class="main-container">
+
+    <!-- =========================================================================
+         VIEW 1: CITIZEN REPORTING PORTAL
+         ========================================================================= -->
+    <section id="citizen-view" class="view-section active">
+      <!-- Quick Citizen Stats -->
+      <div class="banner-grid">
+        <div class="stat-card">
+          <div class="stat-icon green">🏆</div>
+          <div class="stat-data">
+            <h3 id="citizen-stat-points">250</h3>
+            <p>EcoPoints Earned</p>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon blue">📸</div>
+          <div class="stat-data">
+            <h3 id="citizen-stat-reports">3</h3>
+            <p>Spots Reported</p>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon red">🔴</div>
+          <div class="stat-data">
+            <h3>4 hrs</h3>
+            <p>Red Zone BBMP SLA</p>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon orange">🛡️</div>
+          <div class="stat-data">
+            <h3>Level 3</h3>
+            <p>Green Citizen Rank</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Reporting Studio Grid -->
+      <div class="reporting-grid">
+        <!-- Left: Upload & Details -->
+        <div class="panel-card">
+          <div class="panel-header">
+            <div class="panel-title">
+              <span class="icon-badge">📷</span>
+              Report Garbage in Your Society
+            </div>
+            <span style="font-size: 0.75rem; color: var(--brand-500); font-weight: 700;">+50 EcoPoints per verified report</span>
+          </div>
+
+          <!-- Dropzone -->
+          <div id="citizen-dropzone" class="upload-dropzone">
+            <input type="file" id="citizen-file-input" accept="image/*" style="display: none;" />
+            <div class="dropzone-content">
+              <div class="dropzone-icon">📤</div>
+              <div style="font-weight: 700;">Click or Drag & Drop Garbage Photo Here</div>
+              <div class="dropzone-hint">Supports JPEG, PNG, WEBP (Max 15MB)</div>
+            </div>
+          </div>
+
+          <!-- Quick Presets -->
+          <div class="preset-section">
+            <div class="preset-label">Or Pick a Real-World Bangalore Incident Preset:</div>
+            <div class="preset-pills">
+              <button class="preset-pill" data-hint="overflowing dump" data-ward="Ward 112 - Domlur / Indiranagar" data-loc="100ft Rd, Near Sony Signal" data-society="Indiranagar Central" data-img="https://images.unsplash.com/photo-1611284446314-60a58ac0deb9?auto=format&fit=crop&w=800&q=80">
+                🔴 Indiranagar (Overflowing Dump)
+              </button>
+              <button class="preset-pill" data-hint="plastic pile" data-ward="Ward 151 - Koramangala" data-loc="5th Block 80ft Road" data-society="Green Glen Meadows" data-img="https://images.unsplash.com/photo-1530587191325-3db32d826c18?auto=format&fit=crop&w=800&q=80">
+                🟠 Koramangala (Plastic Heap)
+              </button>
+              <button class="preset-pill" data-hint="roadside litter" data-ward="Ward 174 - HSR Layout" data-loc="Sector 2, 19th Main" data-society="Sobha Silicon Oasis" data-img="https://images.unsplash.com/photo-1604187351574-c75ca79f5807?auto=format&fit=crop&w=800&q=80">
+                🟡 HSR Layout (Scattered Litter)
+              </button>
+              <button class="preset-pill" data-hint="construction debris" data-ward="Ward 45 - Malleshwaram" data-loc="8th Cross Margosa Rd" data-society="Sri Krishna Apts" data-img="https://images.unsplash.com/photo-1590496793929-36417d3117de?auto=format&fit=crop&w=800&q=80">
+                🟠 Malleshwaram (Debris Rubble)
+              </button>
+            </div>
+          </div>
+
+          <!-- Location & Ward Details -->
+          <div class="form-row form-group">
+            <div>
+              <label class="form-label">BBMP Ward</label>
+              <select id="citizen-ward-select" class="form-select">
+                <option value="Ward 112 - Domlur / Indiranagar">Ward 112 - Domlur / Indiranagar (East Zone)</option>
+                <option value="Ward 151 - Koramangala">Ward 151 - Koramangala (South Zone)</option>
+                <option value="Ward 174 - HSR Layout">Ward 174 - HSR Layout (Bommanahalli Zone)</option>
+                <option value="Ward 45 - Malleshwaram">Ward 45 - Malleshwaram (West Zone)</option>
+                <option value="Ward 84 - Whitefield">Ward 84 - Whitefield (Mahadevapura Zone)</option>
+                <option value="Ward 162 - Jayanagar 4th Block">Ward 162 - Jayanagar 4th Block</option>
+              </select>
+            </div>
+            <div>
+              <label class="form-label">Society / Apartment Community</label>
+              <input type="text" id="citizen-society-input" class="form-input" placeholder="e.g. Prestige Palm Court" value="Indiranagar Residents Society" />
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Specific Landmark / Street</label>
+            <input type="text" id="citizen-location-input" class="form-input" placeholder="e.g. Near Community Park Gate #2" value="100ft Road, Sony Signal Footpath" />
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.35rem;">
+              <span id="gps-coords-label" class="gps-badge" data-lat="12.9719" data-lng="77.6412">
+                📍 GPS Locked: 12.9719° N, 77.6412° E
+              </span>
+              <button id="btn-get-gps" type="button" class="btn btn-secondary" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;">
+                🔄 Recalibrate GPS
+              </button>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Citizen Note / Hazard Description (Optional)</label>
+            <textarea id="citizen-desc-input" class="form-textarea" rows="2" placeholder="Describe the garbage pile, odor, drain blockage, or hazard..."></textarea>
+          </div>
+
+          <div style="margin-top: 1.25rem;">
+            <button id="btn-run-ai-scan" class="btn btn-secondary btn-block" disabled>
+              ⚡ Run AI Vision Inspection
+            </button>
+          </div>
+        </div>
+
+        <!-- Right: AI Scanner Preview & Severity Output -->
+        <div class="panel-card">
+          <div class="panel-header">
+            <div class="panel-title">
+              <span class="icon-badge">🤖</span>
+              AI Vision Analysis & Severity
+            </div>
+            <span id="scan-status-text" style="font-size: 0.75rem; color: var(--text-tertiary);">
+              Upload or pick a photo to begin AI analysis.
+            </span>
+          </div>
+
+          <!-- Preview & Laser Overlay -->
+          <div id="ai-preview-container" class="ai-preview-container">
+            <div id="ai-preview-empty" style="display: flex; flex-direction: column; align-items: center; gap: 0.5rem; color: var(--text-tertiary);">
+              <span style="font-size: 2rem;">📸</span>
+              <span>No image selected</span>
+            </div>
+            <img id="ai-preview-img" class="ai-preview-img" style="display: none;" alt="Garbage scan target" />
+            <div class="ai-scan-laser"></div>
+            <div id="ai-bbox-layer" class="ai-bbox-layer"></div>
+          </div>
+
+          <!-- AI Results & Zone Output -->
+          <div id="ai-results-panel" class="ai-results-panel" style="display: none;">
+            <!-- Zone Card -->
+            <div id="ai-zone-card" class="zone-badge-card red">
+              <div class="zone-title-group">
+                <div class="zone-indicator-pulse"></div>
+                <div>
+                  <div id="ai-zone-title" class="zone-name">🔴 Red Zone - Critical Hazard</div>
+                  <div id="ai-zone-action" style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 2px;">
+                    Immediate dispatch required: High biohazard & overflow.
+                  </div>
+                </div>
+              </div>
+              <span id="ai-zone-sla" class="sla-pill">SLA: < 4h</span>
+            </div>
+
+            <!-- Volume & Metric Chips -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.5rem; margin-bottom: 1rem;">
+              <div style="background: var(--bg-surface); padding: 0.5rem; border-radius: var(--radius-sm); text-align: center;">
+                <div style="font-size: 0.65rem; color: var(--text-tertiary); text-transform: uppercase;">Volume</div>
+                <div id="ai-metric-volume" style="font-weight: 800; font-size: 0.95rem;">4.8 m³</div>
+              </div>
+              <div style="background: var(--bg-surface); padding: 0.5rem; border-radius: var(--radius-sm); text-align: center;">
+                <div style="font-size: 0.65rem; color: var(--text-tertiary); text-transform: uppercase;">Est. Weight</div>
+                <div id="ai-metric-weight" style="font-weight: 800; font-size: 0.95rem;">~620 kg</div>
+              </div>
+              <div style="background: var(--bg-surface); padding: 0.5rem; border-radius: var(--radius-sm); text-align: center;">
+                <div style="font-size: 0.65rem; color: var(--text-tertiary); text-transform: uppercase;">Hazard Rating</div>
+                <div id="ai-metric-hazard" style="font-weight: 800; font-size: 0.95rem; color: #ef4444;">9.2 / 10</div>
+              </div>
+            </div>
+
+            <!-- Material Breakdown -->
+            <div class="material-breakdown">
+              <div class="mat-item">
+                <span>📦 Plastics</span>
+                <div class="mat-bar-bg"><div id="mat-bar-plastic" class="mat-bar-fill" style="width: 45%; background: #38bdf8;"></div></div>
+                <span id="mat-val-plastic">45%</span>
+              </div>
+              <div class="mat-item">
+                <span>🍃 Bio / Organic</span>
+                <div class="mat-bar-bg"><div id="mat-bar-organic" class="mat-bar-fill" style="width: 38%; background: #10b981;"></div></div>
+                <span id="mat-val-organic">38%</span>
+              </div>
+              <div class="mat-item">
+                <span>☣️ Hazardous</span>
+                <div class="mat-bar-bg"><div id="mat-bar-hazard" class="mat-bar-fill" style="width: 12%; background: #ef4444;"></div></div>
+                <span id="mat-val-hazard">12%</span>
+              </div>
+              <div class="mat-item">
+                <span>🧱 Inert / Rubble</span>
+                <div class="mat-bar-bg"><div id="mat-bar-inert" class="mat-bar-fill" style="width: 5%; background: #fbbf24;"></div></div>
+                <span id="mat-val-inert">5%</span>
+              </div>
+            </div>
+
+            <!-- Submit Button -->
+            <button id="btn-submit-report" class="btn btn-primary btn-block" style="margin-top: 1.25rem;" disabled>
+              🚀 Send Incident to BBMP & Earn 50 EcoPoints
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Citizen My Reports Section -->
+      <div class="panel-card">
+        <div class="panel-header">
+          <div class="panel-title">
+            <span class="icon-badge">📋</span>
+            My Society Incident History & Clearance Status
+          </div>
+          <span style="font-size: 0.8125rem; color: var(--text-tertiary);">Real-time synchronization with BBMP Control Center</span>
+        </div>
+        <div id="citizen-reports-list" class="sidebar-incidents-list" style="max-height: 400px;">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+    </section>
+
+    <!-- =========================================================================
+         VIEW 2: BBMP MUNICIPAL AUTHORITY OPERATIONS WAR ROOM
+         ========================================================================= -->
+    <section id="bbmp-view" class="view-section">
+      <!-- BBMP Top Operations Bar -->
+      <div class="bbmp-toolbar">
+        <div style="display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;">
+          <span class="bbmp-badge-tag">🏛️ BBMP SWM Control Room</span>
+          <span style="font-size: 0.875rem; color: var(--text-secondary);">Bangalore Municipal Solid Waste Monitoring</span>
+        </div>
+        <div style="display: flex; gap: 0.5rem;">
+          <select id="bbmp-ward-filter" class="form-select" style="width: auto; padding: 0.4rem 0.8rem; font-size: 0.8125rem;">
+            <option value="all">All Bangalore Wards</option>
+            <option value="Indiranagar">Ward 112 - Indiranagar</option>
+            <option value="Koramangala">Ward 151 - Koramangala</option>
+            <option value="HSR Layout">Ward 174 - HSR Layout</option>
+            <option value="Malleshwaram">Ward 45 - Malleshwaram</option>
+            <option value="Whitefield">Ward 84 - Whitefield</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Municipal KPI Metrics -->
+      <div class="banner-grid">
+        <div class="stat-card">
+          <div class="stat-icon red">🔴</div>
+          <div class="stat-data">
+            <h3 id="bbmp-metric-red">2</h3>
+            <p>Red Critical Hotspots (<4h SLA)</p>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon orange">🟠</div>
+          <div class="stat-data">
+            <h3 id="bbmp-metric-orange">2</h3>
+            <p>Orange Moderate Piles (<12h SLA)</p>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon yellow">🟡</div>
+          <div class="stat-data">
+            <h3 id="bbmp-metric-yellow">1</h3>
+            <p>Yellow Minor Spots (<24h SLA)</p>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon green">🚛</div>
+          <div class="stat-data">
+            <h3 id="bbmp-metric-tonnage">4.20 MT</h3>
+            <p>Cleared Today by BBMP</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Zone Filter Tabs -->
+      <div style="display: flex; gap: 0.5rem; margin-bottom: 1.25rem; flex-wrap: wrap;">
+        <button class="bbmp-filter-btn filter-btn active" data-filter="all">All Incidents</button>
+        <button class="bbmp-filter-btn filter-btn filter-red" data-filter="red">🔴 Red Zones (Critical)</button>
+        <button class="bbmp-filter-btn filter-btn filter-orange" data-filter="orange">🟠 Orange Zones (Moderate)</button>
+        <button class="bbmp-filter-btn filter-btn filter-yellow" data-filter="yellow">🟡 Yellow Zones (Minor)</button>
+        <button class="bbmp-filter-btn filter-btn filter-green" data-filter="resolved">🟢 Resolved / Cleaned (<span id="bbmp-metric-resolved">1</span>)</button>
+      </div>
+
+      <!-- Real-time Incident Action Cards -->
+      <div id="bbmp-incident-grid" class="bbmp-grid">
+        <!-- Rendered by JS -->
+      </div>
+    </section>
+
+    <!-- =========================================================================
+         VIEW 3: LIVE GIS CITY HEATMAP & ZONES
+         ========================================================================= -->
+    <section id="map-view" class="view-section">
+      <div class="map-view-wrapper">
+        <div class="map-card">
+          <!-- Floating Filters -->
+          <div class="map-floating-controls">
+            <button class="map-filter-btn filter-btn active" data-filter="all">All Zones</button>
+            <button class="map-filter-btn filter-btn filter-red" data-filter="red">🔴 Red Zones</button>
+            <button class="map-filter-btn filter-btn filter-orange" data-filter="orange">🟠 Orange Zones</button>
+            <button class="map-filter-btn filter-btn filter-yellow" data-filter="yellow">🟡 Yellow Zones</button>
+            <button class="map-filter-btn filter-btn filter-green" data-filter="resolved">🟢 Resolved</button>
+          </div>
+
+          <div id="leaflet-map"></div>
+        </div>
+
+        <!-- Map Sidebar -->
+        <div class="map-sidebar">
+          <div class="sidebar-header">
+            <h3 style="font-size: 1rem;">Bangalore Live Hotspots</h3>
+            <span style="font-size: 0.75rem; color: var(--brand-500); font-weight: 700;">Live Feed</span>
+          </div>
+          <div id="map-sidebar-list" class="sidebar-incidents-list">
+            <!-- Rendered by JS -->
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- =========================================================================
+         VIEW 4: WARD ANALYTICS & ESG DASHBOARD
+         ========================================================================= -->
+    <section id="analytics-view" class="view-section">
+      <div class="charts-grid">
+        <div class="chart-container">
+          <h3 style="margin-bottom: 1rem; font-size: 1.1rem;">Ward-Wise Garbage Density & BBMP Clearance</h3>
+          <div style="height: 280px; position: relative;">
+            <canvas id="chart-ward-performance"></canvas>
+          </div>
+        </div>
+
+        <div class="chart-container">
+          <h3 style="margin-bottom: 1rem; font-size: 1.1rem;">City-Wide Waste Material Composition</h3>
+          <div style="height: 280px; position: relative;">
+            <canvas id="chart-waste-composition"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <div class="charts-grid" style="margin-top: 1.5rem;">
+        <div class="chart-container">
+          <h3 style="margin-bottom: 1rem; font-size: 1.1rem;">Zone Severity Breakdown</h3>
+          <div style="height: 260px; position: relative;">
+            <canvas id="chart-zone-distribution"></canvas>
+          </div>
+        </div>
+
+        <div class="chart-container" style="display: flex; flex-direction: column; justify-content: center;">
+          <h3 style="margin-bottom: 0.75rem; font-size: 1.1rem;">BBMP SLA Compliance Index</h3>
+          <div style="display: flex; align-items: baseline; gap: 0.5rem; margin-bottom: 0.5rem;">
+            <span style="font-size: 3rem; font-weight: 800; color: var(--brand-500);">94.8%</span>
+            <span style="color: var(--text-secondary); font-size: 0.875rem;">On-Time Turnaround</span>
+          </div>
+          <p style="font-size: 0.8125rem; line-height: 1.6;">
+            Average Red-Zone response time: <b>2.4 hours</b> (Target: < 4 hours). 
+            Total cleanups executed this week across 8 wards: <b>142 blackspots</b>.
+          </p>
+          <div style="margin-top: 1.25rem; display: flex; gap: 0.75rem;">
+            <button class="btn btn-secondary" onclick="window.ecoApp.showToast('Monthly BBMP SLA audit exported to PDF.', 'success')">
+              📥 Export SLA Audit
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- =========================================================================
+         VIEW 5: AI VISION SANDBOX & SPECS
+         ========================================================================= -->
+    <section id="ai-sandbox" class="view-section">
+      <div class="panel-card">
+        <div class="panel-header">
+          <div class="panel-title">
+            <span class="icon-badge">🧠</span>
+            EcoVision AI Architecture & Zone Decision Engine
+          </div>
+          <span style="font-size: 0.8125rem; color: var(--brand-500); font-weight: 700;">Model: YOLOv9-WasteNet-v4.2</span>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+          <div>
+            <h4 style="margin-bottom: 0.5rem;">How EcoSense AI Categorizes Zones:</h4>
+            <div style="display: flex; flex-direction: column; gap: 0.75rem; margin-top: 0.75rem;">
+              <div style="background: var(--zone-red-bg); border-left: 4px solid var(--zone-red); padding: 0.85rem; border-radius: var(--radius-sm);">
+                <div style="font-weight: 800; color: #f87171;">🔴 Red Zone (Critical Biohazard & Overflow)</div>
+                <div style="font-size: 0.8125rem; color: var(--text-secondary); margin-top: 0.2rem;">
+                  Triggered when waste volume > 3.0 m³, toxic runoffs, rotten organic mass > 35%, or health hazard score ≥ 8.0. <b>BBMP SLA: < 4 Hours.</b>
+                </div>
+              </div>
+
+              <div style="background: var(--zone-orange-bg); border-left: 4px solid var(--zone-orange); padding: 0.85rem; border-radius: var(--radius-sm);">
+                <div style="font-weight: 800; color: #fb923c;">🟠 Orange Zone (Moderate Accumulation)</div>
+                <div style="font-size: 0.8125rem; color: var(--text-secondary); margin-top: 0.2rem;">
+                  Triggered when waste volume is 1.0 - 3.0 m³, unsegregated plastic piles, or construction debris. <b>BBMP SLA: < 12 Hours.</b>
+                </div>
+              </div>
+
+              <div style="background: var(--zone-yellow-bg); border-left: 4px solid var(--zone-yellow); padding: 0.85rem; border-radius: var(--radius-sm);">
+                <div style="font-weight: 800; color: #fde047;">🟡 Yellow Zone (Minor Scattered Litter)</div>
+                <div style="font-size: 0.8125rem; color: var(--text-secondary); margin-top: 0.2rem;">
+                  Triggered for isolated cans, dry paper cups, or minor wrappers under 1.0 m³. <b>BBMP SLA: < 24 Hours.</b>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <h4 style="margin-bottom: 0.5rem;">AI Vision Pipeline Flow:</h4>
+            <div style="background: var(--bg-surface-elevated); padding: 1rem; border-radius: var(--radius-md); font-family: var(--font-mono); font-size: 0.8125rem; line-height: 1.8; color: #94a3b8;">
+              1. <b>Input:</b> 1080p Image Tensor (Camera / Upload)<br>
+              2. <b>Feature Backbone:</b> CSP-Darknet Feature Pyramid<br>
+              3. <b>Bounding Box Head:</b> Multi-class Object Localization<br>
+              4. <b>Semantic Segmentation:</b> Pixel-level Waste Volume Density<br>
+              5. <b>Municipal Dispatch API:</b> Webhook trigger to BBMP Zone Wardens
+            </div>
+            
+            <div style="margin-top: 1rem;">
+              <button class="btn btn-secondary" onclick="window.ecoApp.switchView('citizen-view')">
+                🚀 Test AI Scanner on Citizen Portal
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- =========================================================================
+       MODALS
+       ========================================================================= -->
+
+  <!-- Modal 1: Incident Inspection & Before/After Comparison -->
+  <div id="modal-incident-detail" class="modal-overlay">
+    <div class="modal-card">
+      <button class="modal-close-btn">&times;</button>
+      <h3 id="modal-inc-title" style="font-size: 1.25rem; margin-bottom: 0.25rem;">Incident Details</h3>
+      <p id="modal-inc-society" style="font-size: 0.875rem; color: var(--text-tertiary); margin-bottom: 1rem;">Society details</p>
+
+      <!-- Before/After Comparison Slider (Visible if resolved) -->
+      <div id="modal-compare-wrapper" style="display: none;">
+        <div style="display: flex; justify-content: space-between; font-size: 0.75rem; font-weight: 700; color: var(--text-secondary); margin-bottom: 0.35rem;">
+          <span>📸 BEFORE (Reported Garbage)</span>
+          <span>🟢 AFTER (Cleaned by BBMP)</span>
+        </div>
+        <div class="compare-container">
+          <img id="compare-after-img" class="compare-img" alt="Cleaned street" />
+          <div id="compare-overlay-box" class="compare-overlay">
+            <img id="compare-before-img" alt="Reported dump" />
+          </div>
+          <input type="range" min="0" max="100" value="50" class="compare-slider-input" id="compare-slider-input" />
+        </div>
+        <div style="text-align: center; font-size: 0.75rem; color: var(--text-tertiary);">
+          ↔️ Slide horizontally to compare before and after clearance
+        </div>
+      </div>
+
+      <!-- Single Photo Preview (If pending) -->
+      <div id="modal-single-image-wrapper">
+        <div style="width: 100%; aspect-ratio: 16/10; border-radius: var(--radius-lg); overflow: hidden; background: #000; margin-bottom: 1rem;">
+          <img id="modal-single-img" style="width: 100%; height: 100%; object-fit: cover;" alt="Garbage image" />
+        </div>
+      </div>
+
+      <p id="modal-inc-desc" style="font-size: 0.875rem; margin-bottom: 1rem; line-height: 1.5;"></p>
+
+      <!-- AI Inspection Grid -->
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; background: var(--bg-surface-elevated); padding: 0.85rem; border-radius: var(--radius-md); margin-bottom: 1.25rem;">
+        <div><b>AI Confidence:</b> <span id="modal-ai-conf">96%</span></div>
+        <div><b>Estimated Vol:</b> <span id="modal-ai-vol">4.2 m³</span></div>
+        <div><b>Estimated Weight:</b> <span id="modal-ai-wt">~500 kg</span></div>
+        <div><b>Hazard Index:</b> <span id="modal-ai-hazard" style="color: #ef4444;">8.5/10</span></div>
+        <div style="grid-column: 1 / -1; font-size: 0.8125rem; color: var(--brand-500);">
+          <b>Action:</b> <span id="modal-ai-action">Auto-tipper dispatch</span>
+        </div>
+      </div>
+
+      <!-- Timeline Tracker -->
+      <div style="border-top: 1px solid var(--border-subtle); padding-top: 1rem;">
+        <h4 style="font-size: 0.95rem; margin-bottom: 0.5rem;">Incident Resolution Progress</h4>
+        <div class="timeline-track">
+          <div id="timeline-step-reported" class="timeline-step completed">
+            <b>1. Citizen Reported & Geotagged</b>
+            <span style="font-size: 0.75rem; color: var(--text-tertiary);">Photo uploaded & GPS coordinates registered</span>
+          </div>
+          <div id="timeline-step-ai" class="timeline-step completed">
+            <b>2. AI Vision Classified</b>
+            <span style="font-size: 0.75rem; color: var(--text-tertiary);">Severity assigned to BBMP priority queue</span>
+          </div>
+          <div id="timeline-step-dispatch" class="timeline-step">
+            <b>3. BBMP Sanitation Unit Dispatched</b>
+            <span style="font-size: 0.75rem; color: var(--text-tertiary);">Truck/Crew assigned for on-site clearance</span>
+          </div>
+          <div id="timeline-step-resolved" class="timeline-step">
+            <b>4. Cleared & Verified with Proof Photo</b>
+            <span style="font-size: 0.75rem; color: var(--text-tertiary);">Citizen rewarded EcoPoints & notified</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal 2: BBMP Crew Dispatch -->
+  <div id="modal-dispatch" class="modal-overlay">
+    <div class="modal-card" style="max-width: 500px;">
+      <button class="modal-close-btn">&times;</button>
+      <h3 style="font-size: 1.25rem; margin-bottom: 0.25rem;">Dispatch Sanitation Unit</h3>
+      <p id="dispatch-modal-loc" style="font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 1rem;"></p>
+      
+      <div style="margin-bottom: 1rem;">
+        <span id="dispatch-modal-zone" class="meta-chip" style="font-weight: 800; font-size: 0.8125rem;"></span>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Select Available BBMP Unit / Auto-Tipper:</label>
+        <select id="modal-crew-select" class="form-select">
+          <!-- Populated by JS -->
+        </select>
+      </div>
+
+      <div style="margin-top: 1.5rem; display: flex; justify-content: flex-end; gap: 0.75rem;">
+        <button class="btn btn-secondary" onclick="document.getElementById('modal-dispatch').classList.remove('active')">Cancel</button>
+        <button id="btn-confirm-dispatch" class="btn btn-primary">Confirm & Dispatch</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: AI Anti-Fraud & Resolution Proof Verification -->
+  <div id="modal-resolution" class="modal-overlay">
+    <div class="modal-card" style="max-width: 620px;">
+      <button class="modal-close-btn">&times;</button>
+      <h3 style="font-size: 1.25rem; margin-bottom: 0.25rem; color:#f0fdf4;">📸 AI Verification of Cleanup Proof</h3>
+      <p id="resolution-modal-loc" style="font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 1rem;"></p>
+
+      <!-- Before and After Photos -->
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 1rem;">
+        <div>
+          <div style="font-size: 0.75rem; font-weight: 700; color: #f87171; margin-bottom: 0.25rem;">BEFORE (REPORTED DUMP)</div>
+          <img id="resolution-before-thumb" style="width: 100%; height: 120px; object-fit: cover; border-radius: 6px; border:1px solid rgba(239,68,68,0.4);" alt="Before" />
+        </div>
+        <div>
+          <div style="font-size: 0.75rem; font-weight: 700; color: #34d399; margin-bottom: 0.25rem;">AFTER (WORKER PROOF)</div>
+          <img id="resolution-proof-preview" style="width: 100%; height: 120px; object-fit: cover; border-radius: 6px; border:1px solid rgba(52,211,153,0.4);" alt="Cleaned Proof" />
+        </div>
+      </div>
+
+      <!-- Test Presets to Simulate Genuine vs Fake vs Incomplete -->
+      <div style="background: rgba(4,24,18,0.6); padding: 0.75rem; border-radius: var(--radius-md); border: 1px solid var(--border-subtle); margin-bottom: 1rem;">
+        <div style="font-size: 0.75rem; font-weight: 700; color: var(--text-secondary); margin-bottom: 0.4rem;">
+          🧪 Simulate Worker Upload Scenario (Test AI Fraud Detection):
+        </div>
+        <div style="display: flex; gap: 0.4rem; flex-wrap: wrap;">
+          <button class="proof-preset-btn preset-pill" data-type="passed" style="border-color:#10b981; color:#34d399;">
+            ✅ Genuine 100% Cleaned
+          </button>
+          <button class="proof-preset-btn preset-pill" data-type="incomplete" style="border-color:#f97316; color:#fb923c;">
+            ⚠️ Incomplete / Dirty (Residual Waste)
+          </button>
+          <button class="proof-preset-btn preset-pill" data-type="fake" style="border-color:#ef4444; color:#f87171;">
+            🚨 Fake / Mismatched Image (Fraud Alert)
+          </button>
+        </div>
+      </div>
+
+      <!-- Verification Result Box -->
+      <div id="proof-verification-result" class="verification-result-box" style="display: none;"></div>
+
+      <div style="margin-top: 1.25rem; display: flex; justify-content: space-between; align-items: center;">
+        <button id="btn-verify-proof-ai" class="btn btn-secondary" style="font-size: 0.8125rem;">
+          ⚡ Run AI Cleanliness & Fraud Scan
+        </button>
+        <div style="display: flex; gap: 0.5rem;">
+          <button class="btn btn-secondary" onclick="document.getElementById('modal-resolution').classList.remove('active')">Cancel</button>
+          <button id="btn-confirm-resolve" class="btn btn-primary" style="background: var(--zone-green);" disabled>
+            ✓ Approve & Close Ticket
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Citizen Dispute / Re-Report Dirty Area -->
+  <div id="modal-dispute" class="modal-overlay">
+    <div class="modal-card" style="max-width: 550px;">
+      <button class="modal-close-btn">&times;</button>
+      <h3 style="font-size: 1.25rem; margin-bottom: 0.25rem; color:#f0fdf4;">⚠️ Dispute Resolution / Re-Report Dirty Spot</h3>
+      <p id="dispute-modal-loc" style="font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 1rem;"></p>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 1rem;">
+        <div>
+          <div style="font-size: 0.75rem; font-weight: 700; color: #f87171; margin-bottom: 0.25rem;">ORIGINAL REPORT</div>
+          <img id="dispute-before-img" style="width: 100%; height: 110px; object-fit: cover; border-radius: 6px;" alt="Before" />
+        </div>
+        <div>
+          <div style="font-size: 0.75rem; font-weight: 700; color: #38bdf8; margin-bottom: 0.25rem;">BBMP CLOSED PROOF</div>
+          <img id="dispute-after-img" style="width: 100%; height: 110px; object-fit: cover; border-radius: 6px;" alt="After" />
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Why are you disputing this resolution?</label>
+        <textarea id="dispute-reason-input" class="form-textarea" rows="3" placeholder="e.g. Garbage was not collected, only 20% swept, blackspot is still full of plastic waste..."></textarea>
+      </div>
+
+      <div style="margin-top: 1.25rem; display: flex; justify-content: flex-end; gap: 0.75rem;">
+        <button class="btn btn-secondary" onclick="document.getElementById('modal-dispute').classList.remove('active')">Cancel</button>
+        <button id="btn-confirm-dispute" class="btn btn-danger">
+          🚨 Submit Dispute & Escalate to BBMP Red Alert
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <!-- Scripts -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="js/bundle.js"></script>
+</body>
+</html>

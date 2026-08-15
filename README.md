@@ -1,0 +1,91 @@
+# 🌱 EcoSense - AI-Powered Citizen Waste Reporting & BBMP Action Platform
+
+![EcoSense Banner](https://images.unsplash.com/photo-1611284446314-60a58ac0deb9?auto=format&fit=crop&w=1200&q=80)
+
+An intelligent, community-driven civic platform connecting citizens and the **Bruhat Bengaluru Mahanagara Palike (BBMP)** municipal authority. Citizens snap and upload photos of garbage accumulations in their societies; an AI Vision engine scans the waste, estimates volume/composition, and classifies incidents into **Red, Orange, and Yellow zones**. The BBMP portal receives real-time alerts, coordinates auto-tipper dispatches, and verifies cleanup with before/after photos.
+
+---
+
+## 🌟 Key Features
+
+### 📸 1. Citizen Reporting Portal (`citizen.html`)
+- **Camera & Image Upload**: Capture or drag-and-drop garbage photos with automatic GPS geotagging.
+- **AI Vision Scanning Simulation**:
+  - Laser scanner animation.
+  - Multi-class waste object detection bounding boxes (Plastics, Wet/Organic, Biohazard, Construction Debris).
+  - Material breakdown bars and volume estimation ($m^3$ & kg).
+  - Automated Zone Categorization:
+    - 🔴 **Red Zone (Critical Biohazard / Overflow)** $\to$ SLA: `< 4 Hours`
+    - 🟠 **Orange Zone (Moderate Pile / Debris)** $\to$ SLA: `< 12 Hours`
+    - 🟡 **Yellow Zone (Minor Scattered Litter)** $\to$ SLA: `< 24 Hours`
+- **EcoPoints & Gamification**: Earn **+50 EcoPoints** per report with citizen rank badges.
+- **Live Resolution Tracker**: 4-stage tracking timeline (*Reported* $\to$ *AI Verified* $\to$ *Dispatched* $\to$ *Cleaned*).
+
+### 🏛️ 2. BBMP Municipal Authority War Room (`bbmp.html`)
+- **Operations Command Bar**: Live counters for Red Hotspots, Orange Piles, Yellow Litter, and Cleared Tonnage in Metric Tonnes (MT).
+- **Incident Triage Queue**: Filter by Severity Zone or Ward.
+- **Fleet Dispatcher**: Assign Auto-Tippers, Compactor Trucks, or Sanitation Squads.
+- **Proof-of-Clearance Verification**: Upload cleaned "After" photos and chemical treatment notes to close tickets.
+
+### 🗺️ 3. Interactive Bangalore GIS Map
+- Powered by Leaflet.js with custom pulsing Red, Orange, Yellow, and Green markers across Bangalore wards (Indiranagar, Koramangala, HSR Layout, Whitefield, Malleshwaram, etc.).
+
+### 📊 4. Ward Analytics & ESG Dashboard
+- Chart.js visualizations for Ward-wise garbage density, city-wide material composition, and 94.8% SLA compliance tracking.
+
+---
+
+## 🚀 Quick Start (Running Locally)
+
+### Option 1: Using PowerShell (Built-in Zero Dependency)
+```powershell
+powershell -ExecutionPolicy Bypass -File .\serve.ps1
+```
+Open **[http://localhost:8080](http://localhost:8080)** in your browser.
+
+### Option 2: Using Node / npx
+```bash
+npx serve .
+```
+
+### Option 3: Using Python
+```bash
+python -m http.server 8080
+```
+
+---
+
+## 📁 Project Structure
+
+```
+ecosense/
+├── index.html          # All-in-one unified portal with role switcher
+├── citizen.html        # Dedicated Citizen Reporting Portal
+├── bbmp.html           # Dedicated BBMP Municipal War Room
+├── serve.ps1           # Built-in PowerShell HTTP server
+├── styles/
+│   └── main.css        # Lush botanical eco-green design system
+└── js/
+    ├── app.js          # App orchestrator & cross-tab real-time sync
+    ├── ai-engine.js    # AI Vision object detection & zone scoring engine
+    ├── map-renderer.js # Leaflet.js Bangalore GIS map renderer
+    ├── citizen-portal.js # Citizen photo upload & timeline logic
+    ├── bbmp-portal.js  # BBMP triage & fleet dispatch logic
+    ├── analytics.js    # Chart.js visualizations & ESG metrics
+    └── mock-data.js    # Bangalore wards & sample incident dataset
+```
+
+---
+
+## 🌿 Tech Stack
+
+- **Frontend**: HTML5, Vanilla CSS3 (Custom Botanical Emerald & Sage Design Tokens)
+- **GIS Mapping**: Leaflet.js + CartoDB
+- **Visualizations**: Chart.js 4.4
+- **State Management**: HTML5 Storage API with real-time multi-window event bus
+- **Typography**: Google Fonts (*Plus Jakarta Sans*, *JetBrains Mono*)
+
+---
+
+## 📄 License
+MIT License. Built for smart, clean, and sustainable cities.

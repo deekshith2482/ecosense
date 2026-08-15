@@ -1,0 +1,7 @@
+# .gitignore for EcoSense
+.DS_Store
+Thumbs.db
+node_modules/
+*.log
+.env
+.system_generated/
