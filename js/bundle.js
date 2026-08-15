@@ -409,6 +409,24 @@
           citizenReportsCount: this.citizenReportsCount
         }));
         window.dispatchEvent(new CustomEvent("ecosense_sync"));
+
+        // Push to Cloud Database (Supabase or Firebase) if available
+        const authData = localStorage.getItem("ecosense_auth_user");
+        const user = authData ? JSON.parse(authData) : null;
+
+        if (window.EcoSenseSupabase && window.EcoSenseSupabase.isInitialized) {
+          if (user) {
+            user.ecoPoints = this.ecoPoints;
+            user.reportsCount = this.citizenReportsCount;
+            window.EcoSenseSupabase.syncUserProfile(user);
+          }
+        } else if (window.EcoSenseFirebase && window.EcoSenseFirebase.isInitialized) {
+          if (user) {
+            user.ecoPoints = this.ecoPoints;
+            user.reportsCount = this.citizenReportsCount;
+            window.EcoSenseFirebase.syncUserProfile(user);
+          }
+        }
       } catch (e) {}
     }
 
@@ -458,19 +476,15 @@
           this.audioCtx.resume();
         }
 
+        const now = this.audioCtx.currentTime;
         const osc = this.audioCtx.createOscillator();
         const gain = this.audioCtx.createGain();
+
         osc.connect(gain);
         gain.connect(this.audioCtx.destination);
 
-        if (type === "siren") {
+        if (type === "siren" || type === "fraud") {
           osc.type = "sawtooth";
-          osc.frequency.setValueAtTime(880, this.audioCtx.currentTime);
-          osc.frequency.exponentialRampToValueAtTime(440, this.audioCtx.currentTime + 0.3);
-          gain.gain.setValueAtTime(0.15, this.audioCtx.currentTime);
-          gain.gain.exponentialRampToValueAtTime(0.01, this.audioCtx.currentTime + 0.3);
-          osc.start();
-          osc.stop(this.audioCtx.currentTime + 0.35);
         } else {
           osc.type = "sine";
           osc.frequency.setValueAtTime(587.33, this.audioCtx.currentTime); // D5
@@ -520,6 +534,7 @@
     }
 
     _bindRealtimeSync() {
+      // 1. Browser LocalStorage cross-tab sync
       window.addEventListener("storage", (e) => {
         if (e.key === this.storageKey) {
           this.loadState();
@@ -528,6 +543,19 @@
         }
       });
       window.addEventListener("ecosense_sync", () => this.renderAll());
+
+      // 2. Real-time Firebase Cloud Firestore multi-device listener
+      if (window.EcoSenseFirebase) {
+        window.EcoSenseFirebase.subscribeToIncidents((cloudIncidents) => {
+          if (cloudIncidents && cloudIncidents.length > 0) {
+            console.log("☁️ [EcoSense Sync] Received real-time update from Firebase Cloud:", cloudIncidents.length, "incidents");
+            this.incidents = cloudIncidents;
+            this.saveState();
+            this.renderAll();
+            this.showToast("☁️ Real-time Cloud Sync from Firebase!", "success");
+          }
+        });
+      }
     }
 
     renderAll() {
@@ -758,6 +786,11 @@
       this.ecoPoints += 50;
       this.citizenReportsCount += 1;
       this.saveState();
+      if (window.EcoSenseSupabase && window.EcoSenseSupabase.isInitialized) {
+        window.EcoSenseSupabase.saveIncident(newInc);
+      } else if (window.EcoSenseFirebase) {
+        window.EcoSenseFirebase.saveIncident(newInc);
+      }
       this.showToast("🎉 Report submitted! +50 EcoPoints earned.", "success");
 
       // Reset Form

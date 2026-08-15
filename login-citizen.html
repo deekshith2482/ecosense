@@ -264,6 +264,9 @@
       };
 
       localStorage.setItem("ecosense_auth_user", JSON.stringify(user));
+      if (window.EcoSenseFirebase) {
+        window.EcoSenseFirebase.syncUserProfile(user);
+      }
       window.location.href = "citizen.html";
     }
 
@@ -278,8 +281,15 @@
         loginTime: Date.now()
       };
       localStorage.setItem("ecosense_auth_user", JSON.stringify(user));
+      if (window.EcoSenseFirebase) {
+        window.EcoSenseFirebase.syncUserProfile(user);
+      }
       window.location.href = "citizen.html";
     }
   </script>
+
+  <!-- Supabase Cloud PostgreSQL SDK & Service -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/supabase-service.js"></script>
 </body>
 </html>
