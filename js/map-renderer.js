@@ -28,13 +28,17 @@ export class MapRenderer {
     const container = document.getElementById(this.containerId);
     if (!container) return;
 
-    if (typeof google === "undefined" || !google.maps) {
-      // If Google Maps SDK is loading asynchronously, wait for it or load via EcoSenseMapsConfig
+    if (typeof google === "undefined" || !google.maps || !google.maps.Map) {
       if (window.EcoSenseMapsConfig && window.EcoSenseMapsConfig.loadGoogleMapsSDK) {
         window.EcoSenseMapsConfig.loadGoogleMapsSDK(() => this._createGoogleMap(container));
-      } else {
-        window.addEventListener("ecosense_maps_ready", () => this._createGoogleMap(container));
       }
+      window.addEventListener("ecosense_maps_ready", () => this._createGoogleMap(container), { once: true });
+      
+      setTimeout(() => {
+        if (!this.map && typeof google !== "undefined" && google.maps) {
+          this._createGoogleMap(container);
+        }
+      }, 3000);
       return;
     }
 

@@ -270,8 +270,6 @@
     }
   }
 
-  // 3. MAP RENDERER
-  class MapRenderer {
   // 3. GOOGLE MAPS GEOSPATIAL RENDERER
   class MapRenderer {
     constructor(containerId, onSelect) {
@@ -291,12 +289,18 @@
       const container = document.getElementById(this.containerId);
       if (!container) return;
 
-      if (typeof google === "undefined" || !google.maps) {
+      if (typeof google === "undefined" || !google.maps || !google.maps.Map) {
         if (window.EcoSenseMapsConfig && window.EcoSenseMapsConfig.loadGoogleMapsSDK) {
           window.EcoSenseMapsConfig.loadGoogleMapsSDK(() => this._createGoogleMap(container));
-        } else {
-          window.addEventListener("ecosense_maps_ready", () => this._createGoogleMap(container));
         }
+        window.addEventListener("ecosense_maps_ready", () => this._createGoogleMap(container), { once: true });
+        
+        // Timeout check: if Google Maps API doesn't load within 3 seconds, retry
+        setTimeout(() => {
+          if (!this.map && typeof google !== "undefined" && google.maps) {
+            this._createGoogleMap(container);
+          }
+        }, 3000);
         return;
       }
 
@@ -775,9 +779,18 @@
 
       if (viewId === "map-view") {
         setTimeout(() => {
-          if (this.mapRenderer && this.mapRenderer.map) this.mapRenderer.map.invalidateSize();
+          if (this.mapRenderer) {
+            if (!this.mapRenderer.map) {
+              this.mapRenderer.initMap();
+            } else if (typeof google !== "undefined" && google.maps && google.maps.event) {
+              google.maps.event.trigger(this.mapRenderer.map, "resize");
+              if (this.mapRenderer.bangaloreCenter) {
+                this.mapRenderer.map.setCenter(this.mapRenderer.bangaloreCenter);
+              }
+            }
+          }
           this.renderMapSidebar();
-        }, 150);
+        }, 100);
       }
     }
 
