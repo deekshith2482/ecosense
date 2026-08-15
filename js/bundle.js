@@ -291,10 +291,14 @@
       this.markersLayer = L.layerGroup().addTo(this.map);
 
       const wards = [
-        { name: "Indiranagar (Ward 112)", coords: [[12.980, 77.630], [12.985, 77.655], [12.965, 77.658], [12.960, 77.632]], color: "#ef4444" },
-        { name: "Koramangala (Ward 151)", coords: [[12.945, 77.615], [12.948, 77.640], [12.925, 77.638], [12.922, 77.612]], color: "#f97316" },
-        { name: "HSR Layout (Ward 174)", coords: [[12.920, 77.635], [12.922, 77.660], [12.900, 77.655], [12.902, 77.630]], color: "#eab308" },
-        { name: "Malleshwaram (Ward 45)", coords: [[13.010, 77.560], [13.012, 77.585], [12.988, 77.580], [12.985, 77.558]], color: "#10b981" }
+        { name: "East Zone (Indiranagar / CV Raman / Ulsoor)", coords: [[12.980, 77.610], [12.995, 77.665], [12.960, 77.670], [12.955, 77.615]], color: "#10b981" },
+        { name: "South Zone (Koramangala / Jayanagar / JP Nagar)", coords: [[12.945, 77.560], [12.950, 77.640], [12.905, 77.635], [12.895, 77.565]], color: "#f97316" },
+        { name: "Bommanahalli Zone (HSR / Begur / Electronic City)", coords: [[12.920, 77.620], [12.922, 77.670], [12.860, 77.665], [12.862, 77.595]], color: "#eab308" },
+        { name: "West Zone (Malleshwaram / Rajajinagar / Vijayanagar)", coords: [[13.015, 77.530], [13.018, 77.585], [12.955, 77.580], [12.950, 77.525]], color: "#38bdf8" },
+        { name: "Mahadevapura Zone (Whitefield / Bellandur / Marathahalli)", coords: [[13.010, 77.670], [13.012, 77.770], [12.920, 77.765], [12.922, 77.670]], color: "#ef4444" },
+        { name: "Yelahanka Zone (Yelahanka Town / Jakkur / Thanisandra)", coords: [[13.125, 77.545], [13.130, 77.635], [13.045, 77.630], [13.040, 77.550]], color: "#a855f7" },
+        { name: "RR Nagar Zone (RR Nagar / Kengeri / Jnana Bharathi)", coords: [[12.985, 77.470], [12.990, 77.530], [12.890, 77.525], [12.885, 77.465]], color: "#ec4899" },
+        { name: "Dasarahalli Zone (Peenya / T. Dasarahalli / Bagalagunte)", coords: [[13.060, 77.485], [13.065, 77.535], [13.010, 77.530], [13.005, 77.480]], color: "#14b8a6" }
       ];
 
       wards.forEach(w => {
